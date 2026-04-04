@@ -478,7 +478,7 @@ if htfBear
 // ============================================================================
 
 var int dailyTrades = 0
-newDay = ta.change(time("D"))
+newDay = ta.change(time("D")) != 0
 if newDay
     dailyTrades := 0
 
