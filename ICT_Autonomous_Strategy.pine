@@ -1,9 +1,9 @@
 // This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0
-// © ICT Autonomous Engine - Every Concept
+// © ICT PD Array Engine - Every Concept, Multi-HTF, Pyramiding, Silent Execution
 //@version=6
-strategy("ICT Ultimate v6", overlay=true, margin_long=100, margin_short=100,
-     default_qty_type=strategy.percent_of_equity, default_qty_value=2,
-     pyramiding=0, calc_on_every_tick=true, process_orders_on_close=false,
+strategy("ICT PD Array Engine v6", overlay=true, margin_long=100, margin_short=100,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=1,
+     pyramiding=3, calc_on_every_tick=true, process_orders_on_close=false,
      max_bars_back=500, fill_orders_on_standard_ohlc=true)
 
 // ============================================================================
@@ -14,35 +14,39 @@ ldnKZ    = input.session("0200-0500", "London KZ", group=grp_kz)
 nyKZ     = input.session("0700-1000", "New York KZ", group=grp_kz)
 ldnClKZ  = input.session("1000-1200", "London Close KZ", group=grp_kz)
 asianSS  = input.session("2000-0000", "Asian Session", group=grp_kz)
-sb1      = input.session("0300-0400", "Silver Bullet 1 (3-4AM)", group=grp_kz)
-sb2      = input.session("1000-1100", "Silver Bullet 2 (10-11AM)", group=grp_kz)
-sb3      = input.session("1400-1500", "Silver Bullet 3 (2-3PM)", group=grp_kz)
+sb1      = input.session("0300-0400", "Silver Bullet 1", group=grp_kz)
+sb2      = input.session("1000-1100", "Silver Bullet 2", group=grp_kz)
+sb3      = input.session("1400-1500", "Silver Bullet 3", group=grp_kz)
 
 grp_ms   = "Market Structure"
 swingLen = input.int(5, "Swing Length", minval=2, maxval=20, group=grp_ms)
 
-grp_ob   = "Order Blocks & Breakers"
-obMaxAge = input.int(80, "OB Max Age (bars)", minval=5, maxval=500, group=grp_ob)
+grp_pd   = "PD Arrays"
+obMaxAge  = input.int(80, "OB Max Age", minval=5, maxval=500, group=grp_pd)
+fvgMaxAge = input.int(60, "FVG Max Age", minval=5, maxval=300, group=grp_pd)
+eighthsLen = input.int(50, "Dealing Range Lookback", minval=10, maxval=200, group=grp_pd)
 
-grp_fvg  = "Fair Value Gaps"
-fvgMaxAge = input.int(60, "FVG Max Age (bars)", minval=5, maxval=300, group=grp_fvg)
-
-grp_ote  = "Optimal Trade Entry"
+grp_ote  = "OTE"
 oteFibHi = input.float(0.79, "OTE Upper", group=grp_ote)
 oteFibLo = input.float(0.62, "OTE Lower", group=grp_ote)
 
-grp_risk = "Risk Management"
-rr1      = input.float(1.5, "Partial TP R:R", group=grp_risk)
-rr2      = input.float(3.0, "Final TP R:R", group=grp_risk)
+grp_risk = "Risk & Pyramiding"
+rr1      = input.float(1.5, "Partial TP1 R:R (25%)", group=grp_risk)
+rr2      = input.float(2.5, "Partial TP2 R:R (25%)", group=grp_risk)
+rr3      = input.float(4.0, "Final TP3 R:R (50%)", group=grp_risk)
 useBE    = input.bool(true, "Break-Even at 1R", group=grp_risk)
 maxDaily = input.int(500, "Max Daily Trades", group=grp_risk)
-maxBars  = input.int(45, "Max Bars in Trade", group=grp_risk)
+maxBars  = input.int(60, "Max Bars in Trade", group=grp_risk)
 
-grp_htf  = "HTF Bias"
-htfTF    = input.timeframe("15", "HTF Timeframe", group=grp_htf)
+grp_htf  = "HTF Confluence"
+htf1     = input.timeframe("5", "HTF 1 (5m)", group=grp_htf)
+htf2     = input.timeframe("15", "HTF 2 (15m)", group=grp_htf)
+htf3     = input.timeframe("60", "HTF 3 (1H)", group=grp_htf)
+htf4     = input.timeframe("240", "HTF 4 (4H)", group=grp_htf)
+htf5     = input.timeframe("D", "HTF 5 (Daily)", group=grp_htf)
 
 grp_conf = "Confluence"
-minScore = input.int(5, "Min Confluence (1-12)", minval=1, maxval=12, group=grp_conf)
+minScore = input.int(6, "Min Confluence (1-15)", minval=1, maxval=15, group=grp_conf)
 
 // ============================================================================
 // ATR
@@ -56,19 +60,14 @@ inLDN   = not na(time(timeframe.period, ldnKZ, "America/New_York"))
 inNY    = not na(time(timeframe.period, nyKZ, "America/New_York"))
 inLDNcl = not na(time(timeframe.period, ldnClKZ, "America/New_York"))
 inAsian = not na(time(timeframe.period, asianSS, "America/New_York"))
-inSB1   = not na(time(timeframe.period, sb1, "America/New_York"))
-inSB2   = not na(time(timeframe.period, sb2, "America/New_York"))
-inSB3   = not na(time(timeframe.period, sb3, "America/New_York"))
+inSB    = not na(time(timeframe.period, sb1, "America/New_York")) or not na(time(timeframe.period, sb2, "America/New_York")) or not na(time(timeframe.period, sb3, "America/New_York"))
 inKZ    = inLDN or inNY or inLDNcl
-inSB    = inSB1 or inSB2 or inSB3
 kzOK    = inKZ or inSB
 
 // ============================================================================
-// 2. ASIAN RANGE + RAID (Judas Swing)
+// 2. ASIAN RANGE + JUDAS SWING (AMD Power of 3)
 // ============================================================================
-var float asiaHi = na
-var float asiaLo = na
-var bool  asiaOK = false
+var float asiaHi = na, var float asiaLo = na, var bool asiaOK = false
 
 if inAsian
     if not inAsian[1]
@@ -78,7 +77,6 @@ if inAsian
     else
         asiaHi := math.max(asiaHi, high)
         asiaLo := math.min(asiaLo, low)
-
 if inAsian[1] and not inAsian
     asiaOK := true
 
@@ -86,41 +84,48 @@ asiaRaidHi = asiaOK and high > asiaHi and close < asiaHi
 asiaRaidLo = asiaOK and low < asiaLo and close > asiaLo
 
 // ============================================================================
-// 3. PREVIOUS DAY HIGH/LOW (PDH/PDL) — Major liquidity
+// 3. PDH/PDL — Previous Day High/Low (Major Liquidity)
 // ============================================================================
 pdh = request.security(syminfo.tickerid, "D", high[1], lookahead=barmerge.lookahead_on)
 pdl = request.security(syminfo.tickerid, "D", low[1], lookahead=barmerge.lookahead_on)
-
 pdhSweep = not na(pdh) and high > pdh and close < pdh
 pdlSweep = not na(pdl) and low < pdl and close > pdl
 
 // ============================================================================
-// 4. MIDNIGHT OPEN — ICT's True Day Open
+// 4. PWH/PWL — Previous Week High/Low
+// ============================================================================
+pwh = request.security(syminfo.tickerid, "W", high[1], lookahead=barmerge.lookahead_on)
+pwl = request.security(syminfo.tickerid, "W", low[1], lookahead=barmerge.lookahead_on)
+pwhSweep = not na(pwh) and high > pwh and close < pwh
+pwlSweep = not na(pwl) and low < pwl and close > pwl
+
+// ============================================================================
+// 5. MIDNIGHT OPEN — ICT's True Day Open
 // ============================================================================
 midnightOpen = request.security(syminfo.tickerid, "D", open, lookahead=barmerge.lookahead_on)
 
 // ============================================================================
-// 5. NDOG — New Day Opening Gap
+// 6. NDOG — New Day Opening Gap
 // ============================================================================
-prevDayClose = request.security(syminfo.tickerid, "D", close[1], lookahead=barmerge.lookahead_on)
-currDayOpen  = request.security(syminfo.tickerid, "D", open, lookahead=barmerge.lookahead_on)
-ndogHi       = math.max(nz(prevDayClose), nz(currDayOpen))
-ndogLo       = math.min(nz(prevDayClose), nz(currDayOpen))
-ndogExists   = math.abs(nz(prevDayClose) - nz(currDayOpen)) > atr * 0.1
-inNDOG       = ndogExists and close >= ndogLo and close <= ndogHi
+prevDC = request.security(syminfo.tickerid, "D", close[1], lookahead=barmerge.lookahead_on)
+currDO = request.security(syminfo.tickerid, "D", open, lookahead=barmerge.lookahead_on)
+ndogHi = math.max(nz(prevDC), nz(currDO))
+ndogLo = math.min(nz(prevDC), nz(currDO))
+ndogOn = math.abs(nz(prevDC) - nz(currDO)) > atr * 0.1
+inNDOG = ndogOn and close >= ndogLo and close <= ndogHi
 
 // ============================================================================
-// 6. NWOG — New Week Opening Gap
+// 7. NWOG — New Week Opening Gap
 // ============================================================================
-prevWkClose = request.security(syminfo.tickerid, "W", close[1], lookahead=barmerge.lookahead_on)
-currWkOpen  = request.security(syminfo.tickerid, "W", open, lookahead=barmerge.lookahead_on)
-nwogHi      = math.max(nz(prevWkClose), nz(currWkOpen))
-nwogLo      = math.min(nz(prevWkClose), nz(currWkOpen))
-nwogExists  = math.abs(nz(prevWkClose) - nz(currWkOpen)) > atr * 0.2
-inNWOG      = nwogExists and close >= nwogLo and close <= nwogHi
+prevWC = request.security(syminfo.tickerid, "W", close[1], lookahead=barmerge.lookahead_on)
+currWO = request.security(syminfo.tickerid, "W", open, lookahead=barmerge.lookahead_on)
+nwogHi = math.max(nz(prevWC), nz(currWO))
+nwogLo = math.min(nz(prevWC), nz(currWO))
+nwogOn = math.abs(nz(prevWC) - nz(currWO)) > atr * 0.2
+inNWOG = nwogOn and close >= nwogLo and close <= nwogHi
 
 // ============================================================================
-// 7. MARKET STRUCTURE — BOS & MSS/CHoCH
+// 8. MARKET STRUCTURE — BOS & MSS/CHoCH
 // ============================================================================
 swH = ta.pivothigh(high, swingLen, swingLen)
 swL = ta.pivotlow(low, swingLen, swingLen)
@@ -134,7 +139,6 @@ if not na(swH)
     prevSH := lastSH
     lastSH := swH
     lastSHbar := bar_index - swingLen
-
 if not na(swL)
     prevSL := lastSL
     lastSL := swL
@@ -154,7 +158,7 @@ recentBullMSS = bullMSS or bullMSS[1] or bullMSS[2] or bullMSS[3] or bullMSS[4]
 recentBearMSS = bearMSS or bearMSS[1] or bearMSS[2] or bearMSS[3] or bearMSS[4]
 
 // ============================================================================
-// 8. DISPLACEMENT — Institutional candles
+// 9. DISPLACEMENT — Institutional Intent
 // ============================================================================
 bodySize = math.abs(close - open)
 bullDisp = close > open and bodySize > atr * 1.5
@@ -163,17 +167,12 @@ recentBullDisp = bullDisp or bullDisp[1] or bullDisp[2] or bullDisp[3]
 recentBearDisp = bearDisp or bearDisp[1] or bearDisp[2] or bearDisp[3]
 
 // ============================================================================
-// 9. ORDER BLOCKS + INVERSE OBs
+// 10. ORDER BLOCKS + INVERSE ORDER BLOCKS (PD Array)
 // ============================================================================
 var float bullOB_hi = na, var float bullOB_lo = na
-var int bullOB_bar = 0, var bool bullOB_on = false
-var float bullOB_wick = na
-
+var int bullOB_bar = 0, var bool bullOB_on = false, var float bullOB_wick = na
 var float bearOB_hi = na, var float bearOB_lo = na
-var int bearOB_bar = 0, var bool bearOB_on = false
-var float bearOB_wick = na
-
-// Inverse OBs (failed OB that flips)
+var int bearOB_bar = 0, var bool bearOB_on = false, var float bearOB_wick = na
 var float invBullOB_hi = na, var float invBullOB_lo = na, var bool invBullOB_on = false
 var float invBearOB_hi = na, var float invBearOB_lo = na, var bool invBearOB_on = false
 
@@ -191,13 +190,12 @@ if bearDisp and close[1] > open[1]
     bearOB_bar := bar_index - 1
     bearOB_on := true
 
-// OB mitigation — when mitigated, becomes Inverse OB
+// OB mitigation → becomes Inverse OB (PD Array inversion)
 if bullOB_on and close < bullOB_lo
     invBearOB_hi := bullOB_hi
     invBearOB_lo := bullOB_lo
     invBearOB_on := true
     bullOB_on := false
-
 if bearOB_on and close > bearOB_hi
     invBullOB_hi := bearOB_hi
     invBullOB_lo := bearOB_lo
@@ -208,8 +206,6 @@ if bullOB_on and (bar_index - bullOB_bar) > obMaxAge
     bullOB_on := false
 if bearOB_on and (bar_index - bearOB_bar) > obMaxAge
     bearOB_on := false
-
-// Inverse OB invalidation
 if invBullOB_on and close < invBullOB_lo
     invBullOB_on := false
 if invBearOB_on and close > invBearOB_hi
@@ -221,39 +217,32 @@ inInvBullOB = invBullOB_on and low <= invBullOB_hi and close >= invBullOB_lo
 inInvBearOB = invBearOB_on and high >= invBearOB_lo and close <= invBearOB_hi
 
 // ============================================================================
-// 10. FAIR VALUE GAPS + INVERSE FVG (IFVG)
+// 11. FAIR VALUE GAPS + INVERSE FVG (PD Array)
 // ============================================================================
 var float bullFVG_hi = na, var float bullFVG_lo = na
 var int bullFVG_bar = 0, var bool bullFVG_on = false
-
 var float bearFVG_hi = na, var float bearFVG_lo = na
 var int bearFVG_bar = 0, var bool bearFVG_on = false
-
-// Inverse FVGs
 var float invBullFVG_hi = na, var float invBullFVG_lo = na, var bool invBullFVG_on = false
 var float invBearFVG_hi = na, var float invBearFVG_lo = na, var bool invBearFVG_on = false
 
-// Bullish FVG
 if low > high[2] and (low - high[2]) > atr * 0.05
     bullFVG_hi := low
     bullFVG_lo := high[2]
     bullFVG_bar := bar_index - 1
     bullFVG_on := true
-
-// Bearish FVG
 if high < low[2] and (low[2] - high) > atr * 0.05
     bearFVG_hi := low[2]
     bearFVG_lo := high
     bearFVG_bar := bar_index - 1
     bearFVG_on := true
 
-// FVG mitigation — becomes Inverse FVG
+// FVG mitigation → becomes Inverse FVG
 if bullFVG_on and close < bullFVG_lo
     invBearFVG_hi := bullFVG_hi
     invBearFVG_lo := bullFVG_lo
     invBearFVG_on := true
     bullFVG_on := false
-
 if bearFVG_on and close > bearFVG_hi
     invBullFVG_hi := bearFVG_hi
     invBullFVG_lo := bearFVG_lo
@@ -264,7 +253,6 @@ if bullFVG_on and (bar_index - bullFVG_bar) > fvgMaxAge
     bullFVG_on := false
 if bearFVG_on and (bar_index - bearFVG_bar) > fvgMaxAge
     bearFVG_on := false
-
 if invBullFVG_on and close < invBullFVG_lo
     invBullFVG_on := false
 if invBearFVG_on and close > invBearFVG_hi
@@ -276,7 +264,67 @@ inInvBullFVG = invBullFVG_on and low <= invBullFVG_hi and close >= invBullFVG_lo
 inInvBearFVG = invBearFVG_on and high >= invBearFVG_lo and close <= invBearFVG_hi
 
 // ============================================================================
-// 11. LIQUIDITY SWEEPS (Equal H/L + Swing + PDH/PDL + Asia)
+// 12. BREAKER BLOCKS (PD Array)
+// ============================================================================
+var float bullBrk_hi = na, var float bullBrk_lo = na, var bool bullBrk_on = false
+var float bearBrk_hi = na, var float bearBrk_lo = na, var bool bearBrk_on = false
+
+if bearOB_on[1] and not bearOB_on and high > bearOB_hi[1]
+    bullBrk_hi := bearOB_hi[1]
+    bullBrk_lo := bearOB_lo[1]
+    bullBrk_on := true
+if bullOB_on[1] and not bullOB_on and low < bullOB_lo[1]
+    bearBrk_hi := bullOB_hi[1]
+    bearBrk_lo := bullOB_lo[1]
+    bearBrk_on := true
+
+inBullBrk = bullBrk_on and low <= bullBrk_hi and close >= bullBrk_lo
+inBearBrk = bearBrk_on and high >= bearBrk_lo and close <= bearBrk_hi
+if bullBrk_on and close < bullBrk_lo
+    bullBrk_on := false
+if bearBrk_on and close > bearBrk_hi
+    bearBrk_on := false
+
+// ============================================================================
+// 13. MITIGATION BLOCKS (PD Array) — OB wicked into but body holds
+// ============================================================================
+var float bullMit_hi = na, var float bullMit_lo = na, var bool bullMit_on = false
+var float bearMit_hi = na, var float bearMit_lo = na, var bool bearMit_on = false
+
+bullMitCond = bullOB_on and low <= bullOB_hi and low >= bullOB_lo and close > bullOB_hi
+if bullMitCond and not bullMit_on
+    bullMit_hi := bullOB_hi
+    bullMit_lo := bullOB_lo
+    bullMit_on := true
+bearMitCond = bearOB_on and high >= bearOB_lo and high <= bearOB_hi and close < bearOB_lo
+if bearMitCond and not bearMit_on
+    bearMit_hi := bearOB_hi
+    bearMit_lo := bearOB_lo
+    bearMit_on := true
+
+inBullMit = bullMit_on and low <= bullMit_hi and close >= bullMit_lo
+inBearMit = bearMit_on and high >= bearMit_lo and close <= bearMit_hi
+if bullMit_on and close < bullMit_lo
+    bullMit_on := false
+if bearMit_on and close > bearMit_hi
+    bearMit_on := false
+
+// ============================================================================
+// 14. REJECTION BLOCKS (PD Array) — Long wick candle that rejects from a level
+// ============================================================================
+wickUp   = high - math.max(open, close)
+wickDown = math.min(open, close) - low
+bullRejBlock = wickDown > bodySize * 2 and wickDown > atr * 0.5
+bearRejBlock = wickUp > bodySize * 2 and wickUp > atr * 0.5
+
+// ============================================================================
+// 15. LIQUIDITY VOIDS (PD Array) — Large gap with no trading activity
+// ============================================================================
+liqVoidBull = low > high[1] and (low - high[1]) > atr * 0.8
+liqVoidBear = high < low[1] and (low[1] - high) > atr * 0.8
+
+// ============================================================================
+// 16. LIQUIDITY SWEEPS (Equal H/L + Swing + PDH/PDL + PWH/PWL + Asia)
 // ============================================================================
 var float eqHiLvl = na, var float eqLoLvl = na
 var bool eqHiOn = false, var bool eqLoOn = false
@@ -287,7 +335,6 @@ if not na(swH) and not na(prevSH)
     if math.abs(swH - prevSH) < tol
         eqHiLvl := math.max(swH, prevSH)
         eqHiOn := true
-
 if not na(swL) and not na(prevSL)
     tol = prevSL * 0.0005
     if math.abs(swL - prevSL) < tol
@@ -296,11 +343,11 @@ if not na(swL) and not na(prevSL)
 
 eqLoSweep = eqLoOn and low < eqLoLvl and close > eqLoLvl
 eqHiSweep = eqHiOn and high > eqHiLvl and close < eqHiLvl
-swingSweepBull = not na(lastSL) and low < lastSL and close > lastSL
-swingSweepBear = not na(lastSH) and high > lastSH and close < lastSH
+swSweepBull = not na(lastSL) and low < lastSL and close > lastSL
+swSweepBear = not na(lastSH) and high > lastSH and close < lastSH
 
-liqBull = eqLoSweep or swingSweepBull or pdlSweep or asiaRaidLo
-liqBear = eqHiSweep or swingSweepBear or pdhSweep or asiaRaidHi
+liqBull = eqLoSweep or swSweepBull or pdlSweep or pwlSweep or asiaRaidLo
+liqBear = eqHiSweep or swSweepBear or pdhSweep or pwhSweep or asiaRaidHi
 
 if liqBull
     sweepBullLow := low
@@ -309,17 +356,15 @@ if liqBear
 
 recentBullSweep = liqBull or liqBull[1] or liqBull[2] or liqBull[3] or liqBull[4]
 recentBearSweep = liqBear or liqBear[1] or liqBear[2] or liqBear[3] or liqBear[4]
-
 if eqLoSweep
     eqLoOn := false
 if eqHiSweep
     eqHiOn := false
 
 // ============================================================================
-// 12. TURTLE SOUP — Grab beyond prev session H/L then reverse
+// 17. TURTLE SOUP (PD Array) — Grab beyond prev session H/L then reverse
 // ============================================================================
 var float prevSessHi = na, var float prevSessLo = na
-
 if inKZ and not inKZ[1]
     prevSessHi := ta.highest(high, 60)
     prevSessLo := ta.lowest(low, 60)
@@ -327,64 +372,13 @@ if inKZ and not inKZ[1]
 turtleBull = not na(prevSessLo) and inKZ and low < prevSessLo and close > prevSessLo
 turtleBear = not na(prevSessHi) and inKZ and high > prevSessHi and close < prevSessHi
 
-if turtleBull
+if turtleBull and not na(sweepBullLow)
     sweepBullLow := math.min(sweepBullLow, low)
-if turtleBear
+if turtleBear and not na(sweepBearHigh)
     sweepBearHigh := math.max(sweepBearHigh, high)
 
 // ============================================================================
-// 13. BREAKER BLOCKS
-// ============================================================================
-var float bullBrk_hi = na, var float bullBrk_lo = na, var bool bullBrk_on = false
-var float bearBrk_hi = na, var float bearBrk_lo = na, var bool bearBrk_on = false
-
-if bearOB_on[1] and not bearOB_on and high > bearOB_hi[1]
-    bullBrk_hi := bearOB_hi[1]
-    bullBrk_lo := bearOB_lo[1]
-    bullBrk_on := true
-
-if bullOB_on[1] and not bullOB_on and low < bullOB_lo[1]
-    bearBrk_hi := bullOB_hi[1]
-    bearBrk_lo := bullOB_lo[1]
-    bearBrk_on := true
-
-inBullBrk = bullBrk_on and low <= bullBrk_hi and close >= bullBrk_lo
-inBearBrk = bearBrk_on and high >= bearBrk_lo and close <= bearBrk_hi
-
-if bullBrk_on and close < bullBrk_lo
-    bullBrk_on := false
-if bearBrk_on and close > bearBrk_hi
-    bearBrk_on := false
-
-// ============================================================================
-// 14. MITIGATION BLOCKS — OB partially filled then holds
-// ============================================================================
-var float bullMit_hi = na, var float bullMit_lo = na, var bool bullMit_on = false
-var float bearMit_hi = na, var float bearMit_lo = na, var bool bearMit_on = false
-
-// Bull OB that gets wicked into but body holds above = mitigation block
-bullMitCond = bullOB_on and low <= bullOB_hi and low >= bullOB_lo and close > bullOB_hi
-if bullMitCond and not bullMit_on
-    bullMit_hi := bullOB_hi
-    bullMit_lo := bullOB_lo
-    bullMit_on := true
-
-bearMitCond = bearOB_on and high >= bearOB_lo and high <= bearOB_hi and close < bearOB_lo
-if bearMitCond and not bearMit_on
-    bearMit_hi := bearOB_hi
-    bearMit_lo := bearOB_lo
-    bearMit_on := true
-
-inBullMit = bullMit_on and low <= bullMit_hi and close >= bullMit_lo
-inBearMit = bearMit_on and high >= bearMit_lo and close <= bearMit_hi
-
-if bullMit_on and close < bullMit_lo
-    bullMit_on := false
-if bearMit_on and close > bearMit_hi
-    bearMit_on := false
-
-// ============================================================================
-// 15. OTE — Optimal Trade Entry (Fib 62-79%)
+// 18. OTE — Optimal Trade Entry (Fib 62-79%)
 // ============================================================================
 var bool inOTE_bull = false, var bool inOTE_bear = false
 
@@ -404,103 +398,162 @@ else
     inOTE_bear := false
 
 // ============================================================================
-// 16. PREMIUM / DISCOUNT + QUADRANTS
+// 19. PREMIUM / DISCOUNT with 8THS (ICT's Quadrants in 8ths)
+//     Dealing range split into 8 equal zones at 12.5% increments
+//     0%=Low, 12.5%=1/8, 25%=Q1, 37.5%=3/8, 50%=EQ, 62.5%=5/8, 75%=Q3, 87.5%=7/8, 100%=High
+//     Buy zones: 1/8, 2/8(Q1), 3/8 — Sell zones: 5/8, 6/8(Q3), 7/8
+//     Sweet spots: 3/8 (just below EQ) and 5/8 (just above EQ)
 // ============================================================================
-pdHi = ta.highest(high, 40)
-pdLo = ta.lowest(low, 40)
-eq   = (pdHi + pdLo) / 2
-dealRange = pdHi - pdLo
-q1 = pdLo + dealRange * 0.25   // Deep discount
-q2 = pdLo + dealRange * 0.50   // Equilibrium
-q3 = pdLo + dealRange * 0.75   // Premium zone
+drHi = ta.highest(high, eighthsLen)
+drLo = ta.lowest(low, eighthsLen)
+drRange = drHi - drLo
+eq   = drLo + drRange * 0.5
 
-inDeepDiscount = close < q1
-inDiscount     = close < q2
-inPremium      = close > q2
-inDeepPremium  = close > q3
+// 8ths levels
+e1 = drLo + drRange * 0.125   // 1/8 — extreme discount
+e2 = drLo + drRange * 0.250   // 2/8 (Q1) — deep discount
+e3 = drLo + drRange * 0.375   // 3/8 — discount sweet spot
+e4 = drLo + drRange * 0.500   // 4/8 (EQ) — equilibrium
+e5 = drLo + drRange * 0.625   // 5/8 — premium sweet spot
+e6 = drLo + drRange * 0.750   // 6/8 (Q3) — deep premium
+e7 = drLo + drRange * 0.875   // 7/8 — extreme premium
 
-// Quadrant alignment for entries
-quadBull = inDeepDiscount or (inDiscount and trend == 1)
-quadBear = inDeepPremium or (inPremium and trend == -1)
+// Which 8th is price in?
+inE1 = close <= e1                      // Extreme discount (below 1/8)
+inE2 = close > e1 and close <= e2       // Deep discount (1/8 to 2/8)
+inE3 = close > e2 and close <= e3       // Discount sweet spot (2/8 to 3/8)
+inE4lo = close > e3 and close <= e4     // Below equilibrium (3/8 to EQ)
+inE4hi = close > e4 and close <= e5     // Above equilibrium (EQ to 5/8)
+inE5 = close > e4 and close <= e5       // Premium sweet spot entry
+inE6 = close > e5 and close <= e6       // Deep premium (5/8 to 6/8)
+inE7 = close > e6 and close <= e7       // Extreme premium (6/8 to 7/8)
+inE8 = close > e7                       // Above 7/8
+
+inDiscount = close < e4
+inPremium  = close > e4
+
+// PD Array 8ths alignment — buy in discount 8ths, sell in premium 8ths
+// ICT sweet spots are 3/8 for buys and 5/8 for sells
+eighthBull = inE1 or inE2 or inE3 or inE4lo  // Below EQ = buy zone
+eighthBear = inE4hi or inE5 or inE6 or inE7 or inE8  // Above EQ = sell zone
+eighthSweetBull = inE3 or inE2 or inE1  // Deep discount 8ths
+eighthSweetBear = inE5 or inE6 or inE7  // Deep premium 8ths
 
 // ============================================================================
-// 17. HTF BIAS — 15m structure
+// 20. MULTI-TIMEFRAME CONFLUENCE
+//     ICT always works top-down: Monthly → Daily → 4H → 1H → 15m → 5m → 1m
+//     Each HTF that agrees with the trade adds weight
 // ============================================================================
-htfClose = request.security(syminfo.tickerid, htfTF, close)
-htfOpen  = request.security(syminfo.tickerid, htfTF, open)
-htfATR   = request.security(syminfo.tickerid, htfTF, ta.atr(14))
-htfBody  = math.abs(htfClose - htfOpen)
-htfBull  = htfClose > htfOpen
-htfBear  = htfClose < htfOpen
-htfBullDisp = htfBull and htfBody > htfATR * 1.0
-htfBearDisp = htfBear and htfBody > htfATR * 1.0
+// 5m bias
+htf1c = request.security(syminfo.tickerid, htf1, close)
+htf1o = request.security(syminfo.tickerid, htf1, open)
+htf1bull = htf1c > htf1o
+htf1bear = htf1c < htf1o
+
+// 15m bias
+htf2c = request.security(syminfo.tickerid, htf2, close)
+htf2o = request.security(syminfo.tickerid, htf2, open)
+htf2bull = htf2c > htf2o
+htf2bear = htf2c < htf2o
+
+// 1H bias
+htf3c = request.security(syminfo.tickerid, htf3, close)
+htf3o = request.security(syminfo.tickerid, htf3, open)
+htf3bull = htf3c > htf3o
+htf3bear = htf3c < htf3o
+
+// 4H bias
+htf4c = request.security(syminfo.tickerid, htf4, close)
+htf4o = request.security(syminfo.tickerid, htf4, open)
+htf4bull = htf4c > htf4o
+htf4bear = htf4c < htf4o
+
+// Daily bias
+htf5c = request.security(syminfo.tickerid, htf5, close)
+htf5o = request.security(syminfo.tickerid, htf5, open)
+htf5bull = htf5c > htf5o
+htf5bear = htf5c < htf5o
+
+// Count aligned HTFs
+htfBullCount = (htf1bull ? 1 : 0) + (htf2bull ? 1 : 0) + (htf3bull ? 1 : 0) + (htf4bull ? 1 : 0) + (htf5bull ? 1 : 0)
+htfBearCount = (htf1bear ? 1 : 0) + (htf2bear ? 1 : 0) + (htf3bear ? 1 : 0) + (htf4bear ? 1 : 0) + (htf5bear ? 1 : 0)
+
+htfStrongBull = htfBullCount >= 3  // At least 3 of 5 HTFs bullish
+htfStrongBear = htfBearCount >= 3
 
 // ============================================================================
-// 18. CONFIRMATION CANDLE — Rejection/Engulfing at entry zone
+// 21. CONFIRMATION CANDLE — Rejection or Engulfing at entry zone
 // ============================================================================
-// Bullish rejection: long lower wick, small body, closed in upper half
-bullWickRatio = high != low ? (close - low) / (high - low) : 0.0
-bearWickRatio = high != low ? (high - close) / (high - low) : 0.0
-bullRejection = bullWickRatio > 0.65 and bodySize < (high - low) * 0.4
-bearRejection = bearWickRatio > 0.65 and bodySize < (high - low) * 0.4
-
-// Engulfing
+bullWickR = high != low ? (close - low) / (high - low) : 0.0
+bearWickR = high != low ? (high - close) / (high - low) : 0.0
+bullReject = bullWickR > 0.65 and bodySize < (high - low) * 0.4
+bearReject = bearWickR > 0.65 and bodySize < (high - low) * 0.4
 bullEngulf = close > open and close > high[1] and open <= low[1]
 bearEngulf = close < open and close < low[1] and open >= high[1]
-
-confirmBull = bullRejection or bullEngulf
-confirmBear = bearRejection or bearEngulf
+confirmBull = bullReject or bullEngulf or bullRejBlock
+confirmBear = bearReject or bearEngulf or bearRejBlock
 
 // ============================================================================
-// 19. CONFLUENCE SCORING ENGINE (Weighted, max 12)
+// 22. CONFLUENCE SCORING ENGINE (Weighted, max 15)
+//     Every PD Array and concept that aligns adds weight
 // ============================================================================
 var int bullC = 0, var int bearC = 0
 bullC := 0
 bearC := 0
 
-// +2 Liquidity swept (MOST important — ICT's #1 rule)
+// +2 Liquidity swept (ICT's #1 — must happen first)
 if recentBullSweep or turtleBull
     bullC += 2
 if recentBearSweep or turtleBear
     bearC += 2
 
-// +2 MSS/CHoCH confirmed
+// +2 MSS/CHoCH confirmed (ICT's #2 — confirms smart money shifted)
 if recentBullMSS
     bullC += 2
 if recentBearMSS
     bearC += 2
 
-// +1 In OB / Breaker / Inverse OB / Mitigation Block
+// +1 PD Array: OB / Breaker / Inverse OB / Mitigation Block
 if inBullOB or inBullBrk or inInvBullOB or inBullMit
     bullC += 1
 if inBearOB or inBearBrk or inInvBearOB or inBearMit
     bearC += 1
 
-// +1 In FVG / Inverse FVG
+// +1 PD Array: FVG / Inverse FVG
 if inBullFVG or inInvBullFVG
     bullC += 1
 if inBearFVG or inInvBearFVG
     bearC += 1
 
-// +1 In OTE zone
+// +1 PD Array: Rejection Block
+if bullRejBlock and inDiscount
+    bullC += 1
+if bearRejBlock and inPremium
+    bearC += 1
+
+// +1 OTE zone
 if inOTE_bull
     bullC += 1
 if inOTE_bear
     bearC += 1
 
-// +1 Premium/Discount + Quadrant
-if quadBull
+// +2 8ths alignment (sweet spots get +2, regular discount/premium +1)
+if eighthSweetBull
+    bullC += 2
+else if eighthBull
     bullC += 1
-if quadBear
+if eighthSweetBear
+    bearC += 2
+else if eighthBear
     bearC += 1
 
-// +1 HTF Bias aligned
-if htfBull or htfBullDisp
-    bullC += 1
-if htfBear or htfBearDisp
-    bearC += 1
+// +2 Multi-HTF alignment (3+ HTFs agree)
+if htfStrongBull
+    bullC += 2
+if htfStrongBear
+    bearC += 2
 
-// +1 Kill Zone or Silver Bullet active
+// +1 Kill Zone / Silver Bullet active
 if kzOK
     bullC += 1
     bearC += 1
@@ -517,7 +570,7 @@ if inNDOG or inNWOG
     bearC += 1
 
 // ============================================================================
-// 20. DAILY TRADE LIMITER
+// 23. DAILY TRADE LIMITER
 // ============================================================================
 var int dayTrades = 0
 if ta.change(time("D")) != 0
@@ -525,19 +578,39 @@ if ta.change(time("D")) != 0
 canGo = dayTrades < maxDaily
 
 // ============================================================================
-// 21. ENTRY CONDITIONS — ICT 2022 Model
+// 24. ENTRY CONDITIONS — ICT 2022 Model + Pyramid Logic
+//     Entry 1: Initial entry on sweep + MSS + PD Array
+//     Entry 2: Price retests deeper into OB/FVG (pyramid add)
+//     Entry 3: Price hits OTE zone (final pyramid add)
 // ============================================================================
-goLong  = bullC >= minScore and canGo and strategy.position_size == 0 and recentBullDisp
-goShort = bearC >= minScore and canGo and strategy.position_size == 0 and recentBearDisp
+noPos    = strategy.position_size == 0
+isLong   = strategy.position_size > 0
+isShort  = strategy.position_size < 0
+
+// First entry — full model
+goLong1  = bullC >= minScore and canGo and noPos and recentBullDisp and kzOK
+goShort1 = bearC >= minScore and canGo and noPos and recentBearDisp and kzOK
+
+// Pyramid entry 2 — deeper into PD Array while in profit
+goLong2  = isLong and strategy.openprofit > 0 and (inBullOB or inBullFVG) and bullC >= (minScore - 1) and strategy.opentrades < 2
+goShort2 = isShort and strategy.openprofit > 0 and (inBearOB or inBearFVG) and bearC >= (minScore - 1) and strategy.opentrades < 2
+
+// Pyramid entry 3 — OTE zone hit while still in profit
+goLong3  = isLong and strategy.openprofit > 0 and inOTE_bull and confirmBull and strategy.opentrades < 3
+goShort3 = isShort and strategy.openprofit > 0 and inOTE_bear and confirmBear and strategy.opentrades < 3
 
 // ============================================================================
-// 22. MAGNIFICENT STOP LOSS + TAKE PROFIT
+// 25. MAGNIFICENT STOP LOSS (ICT's SL Concepts)
+//     Priority 1: Behind sweep candle wick (liquidity already grabbed)
+//     Priority 2: Behind OB candle wick (institutional floor/ceiling)
+//     Priority 3: Behind swing low/high (structural protection)
+//     Pick the DEEPEST + 2 tick micro-buffer
 // ============================================================================
-var float sl_l = na, var float tp1_l = na, var float tp2_l = na
-var float sl_s = na, var float tp1_s = na, var float tp2_s = na
+var float sl_l = na, var float tp1_l = na, var float tp2_l = na, var float tp3_l = na
+var float sl_s = na, var float tp1_s = na, var float tp2_s = na, var float tp3_s = na
 var float entryPx = na, var int entryBar = 0
 
-if goLong
+if goLong1
     s1 = not na(sweepBullLow) ? sweepBullLow : na
     s2 = bullOB_on ? bullOB_wick : na
     s3 = not na(lastSL) ? lastSL : na
@@ -550,14 +623,16 @@ if goLong
         best := s3
     sl_l := best - syminfo.mintick * 2
     dist = close - sl_l
-    tp1_l := close + dist * rr1
-    // Target opposing liquidity or fixed RR
-    oppLiq = not na(pdh) ? pdh : close + dist * rr2
-    tp2_l := math.max(oppLiq, close + dist * rr2)
+    // Partial TPs at key R levels — ICT scales out
+    tp1_l := close + dist * rr1   // 25% off at 1.5R
+    tp2_l := close + dist * rr2   // 25% off at 2.5R
+    // Final TP: opposing liquidity or fixed R:R
+    oppLiq = not na(pdh) ? pdh : close + dist * rr3
+    tp3_l := math.max(oppLiq, close + dist * rr3)  // 50% rides to target
     entryPx := close
     entryBar := bar_index
 
-if goShort
+if goShort1
     s1 = not na(sweepBearHigh) ? sweepBearHigh : na
     s2 = bearOB_on ? bearOB_wick : na
     s3 = not na(lastSH) ? lastSH : na
@@ -571,171 +646,96 @@ if goShort
     sl_s := best + syminfo.mintick * 2
     dist = sl_s - close
     tp1_s := close - dist * rr1
-    oppLiq = not na(pdl) ? pdl : close - dist * rr2
-    tp2_s := math.min(oppLiq, close - dist * rr2)
+    tp2_s := close - dist * rr2
+    oppLiq = not na(pdl) ? pdl : close - dist * rr3
+    tp3_s := math.min(oppLiq, close - dist * rr3)
     entryPx := close
     entryBar := bar_index
 
 // ============================================================================
-// 23. BREAK-EVEN AT 1R
+// 26. BREAK-EVEN AT 1R — Eliminate risk once in profit
 // ============================================================================
-if useBE and strategy.position_size > 0 and not na(entryPx) and not na(sl_l)
+if useBE and isLong and not na(entryPx) and not na(sl_l)
     oneR = entryPx + (entryPx - sl_l)
     if high >= oneR
         sl_l := entryPx + syminfo.mintick * 2
 
-if useBE and strategy.position_size < 0 and not na(entryPx) and not na(sl_s)
+if useBE and isShort and not na(entryPx) and not na(sl_s)
     oneR = entryPx - (sl_s - entryPx)
     if low <= oneR
         sl_s := entryPx - syminfo.mintick * 2
 
 // ============================================================================
-// 24. TIME EXIT
+// 27. TIME EXIT — Don't hold 1m trades too long
 // ============================================================================
-timeExitL = strategy.position_size > 0 and (bar_index - entryBar) >= maxBars
-timeExitS = strategy.position_size < 0 and (bar_index - entryBar) >= maxBars
+timeExitL = isLong and (bar_index - entryBar) >= maxBars
+timeExitS = isShort and (bar_index - entryBar) >= maxBars
 
 // ============================================================================
-// 25. AUTONOMOUS EXECUTION
+// 28. AUTONOMOUS EXECUTION — Pyramiding + Partial TPs
+//     ICT's partial profit: 25% at TP1, 25% at TP2, 50% rides to TP3
 // ============================================================================
-if goLong
-    strategy.entry("L", strategy.long)
-    strategy.exit("LX1", "L", stop=sl_l, limit=tp1_l, qty_percent=50)
-    strategy.exit("LX2", "L", stop=sl_l, limit=tp2_l)
+
+// Entry 1 — Initial position
+if goLong1
+    strategy.entry("L1", strategy.long)
+    strategy.exit("LX1", "L1", stop=sl_l, limit=tp1_l, qty_percent=25)
+    strategy.exit("LX2", "L1", stop=sl_l, limit=tp2_l, qty_percent=33)
+    strategy.exit("LX3", "L1", stop=sl_l, limit=tp3_l)
     dayTrades += 1
 
-if goShort
-    strategy.entry("S", strategy.short)
-    strategy.exit("SX1", "S", stop=sl_s, limit=tp1_s, qty_percent=50)
-    strategy.exit("SX2", "S", stop=sl_s, limit=tp2_s)
+if goShort1
+    strategy.entry("S1", strategy.short)
+    strategy.exit("SX1", "S1", stop=sl_s, limit=tp1_s, qty_percent=25)
+    strategy.exit("SX2", "S1", stop=sl_s, limit=tp2_s, qty_percent=33)
+    strategy.exit("SX3", "S1", stop=sl_s, limit=tp3_s)
+    dayTrades += 1
+
+// Entry 2 — Pyramid add at PD Array retest
+if goLong2
+    strategy.entry("L2", strategy.long)
+    strategy.exit("L2X", "L2", stop=sl_l, limit=tp3_l)
+    dayTrades += 1
+
+if goShort2
+    strategy.entry("S2", strategy.short)
+    strategy.exit("S2X", "S2", stop=sl_s, limit=tp3_s)
+    dayTrades += 1
+
+// Entry 3 — Pyramid add at OTE
+if goLong3
+    strategy.entry("L3", strategy.long)
+    strategy.exit("L3X", "L3", stop=sl_l, limit=tp3_l)
+    dayTrades += 1
+
+if goShort3
+    strategy.entry("S3", strategy.short)
+    strategy.exit("S3X", "S3", stop=sl_s, limit=tp3_s)
     dayTrades += 1
 
 // Dynamic SL updates (break-even movement)
-if strategy.position_size > 0 and not goLong
-    strategy.exit("LX1", "L", stop=sl_l, limit=tp1_l, qty_percent=50)
-    strategy.exit("LX2", "L", stop=sl_l, limit=tp2_l)
+if isLong and not goLong1
+    strategy.exit("LX1", "L1", stop=sl_l, limit=tp1_l, qty_percent=25)
+    strategy.exit("LX2", "L1", stop=sl_l, limit=tp2_l, qty_percent=33)
+    strategy.exit("LX3", "L1", stop=sl_l, limit=tp3_l)
+    strategy.exit("L2X", "L2", stop=sl_l, limit=tp3_l)
+    strategy.exit("L3X", "L3", stop=sl_l, limit=tp3_l)
 
-if strategy.position_size < 0 and not goShort
-    strategy.exit("SX1", "S", stop=sl_s, limit=tp1_s, qty_percent=50)
-    strategy.exit("SX2", "S", stop=sl_s, limit=tp2_s)
+if isShort and not goShort1
+    strategy.exit("SX1", "S1", stop=sl_s, limit=tp1_s, qty_percent=25)
+    strategy.exit("SX2", "S1", stop=sl_s, limit=tp2_s, qty_percent=33)
+    strategy.exit("SX3", "S1", stop=sl_s, limit=tp3_s)
+    strategy.exit("S2X", "S2", stop=sl_s, limit=tp3_s)
+    strategy.exit("S3X", "S3", stop=sl_s, limit=tp3_s)
 
-// Emergency MSS exit
-if strategy.position_size > 0 and bearMSS
-    strategy.close("L", comment="MSS Flip")
-if strategy.position_size < 0 and bullMSS
-    strategy.close("S", comment="MSS Flip")
+// Emergency MSS exit — structure completely flips
+if isLong and bearMSS
+    strategy.close_all(comment="MSS Flip")
+if isShort and bullMSS
+    strategy.close_all(comment="MSS Flip")
 
 // Time exit
 if timeExitL
-    strategy.close("L", comment="Time")
+    strategy.close_all(comment="Time")
 if timeExitS
-    strategy.close("S", comment="Time")
-
-// ============================================================================
-// 26. VISUALS — BUY/SELL Labels + SL/TP Lines
-// ============================================================================
-plotshape(goLong, "BUY", shape.labelup, location.belowbar, color.lime, text="BUY", textcolor=color.white, size=size.normal)
-plotshape(goShort, "SELL", shape.labeldown, location.abovebar, color.red, text="SELL", textcolor=color.white, size=size.normal)
-
-// SL lines
-plot(strategy.position_size > 0 ? sl_l : na, "Long SL", color.new(color.red, 0), 2, plot.style_linebr)
-plot(strategy.position_size < 0 ? sl_s : na, "Short SL", color.new(color.red, 0), 2, plot.style_linebr)
-
-// TP lines
-plot(strategy.position_size > 0 ? tp1_l : na, "Long TP1", color.new(color.lime, 40), 1, plot.style_linebr)
-plot(strategy.position_size > 0 ? tp2_l : na, "Long TP2", color.new(color.lime, 0), 2, plot.style_linebr)
-plot(strategy.position_size < 0 ? tp1_s : na, "Short TP1", color.new(color.lime, 40), 1, plot.style_linebr)
-plot(strategy.position_size < 0 ? tp2_s : na, "Short TP2", color.new(color.lime, 0), 2, plot.style_linebr)
-
-// Midnight open line
-plot(midnightOpen, "Midnight Open", color.new(color.yellow, 50), 1, plot.style_stepline)
-
-// PDH/PDL
-plot(pdh, "PDH", color.new(color.orange, 50), 1, plot.style_stepline)
-plot(pdl, "PDL", color.new(color.orange, 50), 1, plot.style_stepline)
-
-// Equilibrium
-plot(eq, "Equilibrium", color.new(color.white, 60), 1, plot.style_stepline)
-
-// ============================================================================
-// 27. PnL DASHBOARD
-// ============================================================================
-var int totalWins = 0, var int totalLosses = 0, var float totalPnL = 0.0
-var float lastEquity = 0.0
-
-if strategy.closedtrades > 0
-    lastTradeIdx = strategy.closedtrades - 1
-    lastPnL = strategy.closedtrades.profit(lastTradeIdx)
-    if ta.change(strategy.closedtrades) != 0
-        totalPnL += lastPnL
-        if lastPnL > 0
-            totalWins += 1
-        else
-            totalLosses += 1
-
-totalTrades = totalWins + totalLosses
-winRate = totalTrades > 0 ? (totalWins / totalTrades) * 100.0 : 0.0
-
-var table dash = table.new(position.top_right, 2, 12, bgcolor=color.new(color.black, 15), border_width=1)
-
-if barstate.islast
-    table.cell(dash, 0, 0, "ICT ULTIMATE v6", text_color=color.white, text_size=size.normal, bgcolor=color.new(#1a1aff, 30))
-    table.cell(dash, 1, 0, "", bgcolor=color.new(#1a1aff, 30))
-
-    table.cell(dash, 0, 1, "Total Trades", text_color=color.white, text_size=size.small)
-    table.cell(dash, 1, 1, str.tostring(totalTrades), text_color=color.white, text_size=size.small)
-
-    table.cell(dash, 0, 2, "Wins", text_color=color.white, text_size=size.small)
-    table.cell(dash, 1, 2, str.tostring(totalWins), text_color=color.lime, text_size=size.small)
-
-    table.cell(dash, 0, 3, "Losses", text_color=color.white, text_size=size.small)
-    table.cell(dash, 1, 3, str.tostring(totalLosses), text_color=color.red, text_size=size.small)
-
-    table.cell(dash, 0, 4, "Win Rate", text_color=color.white, text_size=size.small)
-    table.cell(dash, 1, 4, str.tostring(winRate, "#.##") + "%",
-         text_color=winRate >= 60 ? color.lime : winRate >= 45 ? color.yellow : color.red, text_size=size.small)
-
-    table.cell(dash, 0, 5, "Net PnL", text_color=color.white, text_size=size.small)
-    table.cell(dash, 1, 5, str.tostring(strategy.netprofit, "#.##"),
-         text_color=strategy.netprofit >= 0 ? color.lime : color.red, text_size=size.small)
-
-    table.cell(dash, 0, 6, "Position", text_color=color.white, text_size=size.small)
-    table.cell(dash, 1, 6, strategy.position_size > 0 ? "LONG" : strategy.position_size < 0 ? "SHORT" : "FLAT",
-         text_color=strategy.position_size > 0 ? color.lime : strategy.position_size < 0 ? color.red : color.gray, text_size=size.small)
-
-    table.cell(dash, 0, 7, "Daily Trades", text_color=color.white, text_size=size.small)
-    table.cell(dash, 1, 7, str.tostring(dayTrades) + " / " + str.tostring(maxDaily),
-         text_color=canGo ? color.lime : color.red, text_size=size.small)
-
-    table.cell(dash, 0, 8, "Bull Score", text_color=color.white, text_size=size.small)
-    table.cell(dash, 1, 8, str.tostring(bullC) + " / 12",
-         text_color=bullC >= minScore ? color.lime : color.yellow, text_size=size.small)
-
-    table.cell(dash, 0, 9, "Bear Score", text_color=color.white, text_size=size.small)
-    table.cell(dash, 1, 9, str.tostring(bearC) + " / 12",
-         text_color=bearC >= minScore ? color.red : color.yellow, text_size=size.small)
-
-    table.cell(dash, 0, 10, "Session", text_color=color.white, text_size=size.small)
-    sessText = inSB ? "SILVER BULLET" : inLDN ? "LONDON" : inNY ? "NEW YORK" : inLDNcl ? "LDN CLOSE" : inAsian ? "ASIAN" : "OFF"
-    table.cell(dash, 1, 10, sessText,
-         text_color=kzOK ? color.lime : color.gray, text_size=size.small)
-
-    table.cell(dash, 0, 11, "Active", text_color=color.white, text_size=size.small)
-    activeText = ""
-    if bullOB_on or bearOB_on
-        activeText += "OB "
-    if bullFVG_on or bearFVG_on
-        activeText += "FVG "
-    if invBullOB_on or invBearOB_on
-        activeText += "iOB "
-    if invBullFVG_on or invBearFVG_on
-        activeText += "iFVG "
-    if bullBrk_on or bearBrk_on
-        activeText += "BRK "
-    if inNDOG
-        activeText += "NDOG "
-    if inNWOG
-        activeText += "NWOG "
-    if activeText == ""
-        activeText := "---"
-    table.cell(dash, 1, 11, activeText, text_color=color.aqua, text_size=size.small)
+    strategy.close_all(comment="Time")
