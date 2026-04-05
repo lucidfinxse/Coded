@@ -31,9 +31,9 @@ oteFibHi = input.float(0.79, "OTE Upper", group=grp_ote)
 oteFibLo = input.float(0.62, "OTE Lower", group=grp_ote)
 
 grp_risk = "Risk & Pyramiding"
-rr1      = input.float(1.5, "Partial TP1 R:R (25%)", group=grp_risk)
-rr2      = input.float(2.5, "Partial TP2 R:R (25%)", group=grp_risk)
-rr3      = input.float(4.0, "Final TP3 R:R (50%)", group=grp_risk)
+rr1      = input.float(1.0, "Partial TP1 R:R (50%)", group=grp_risk)
+rr2      = input.float(1.5, "Partial TP2 R:R (30%)", group=grp_risk)
+rr3      = input.float(2.0, "Final TP3 R:R (20%)", group=grp_risk)
 useBE    = input.bool(true, "Break-Even at 1R", group=grp_risk)
 maxDaily = input.int(500, "Max Daily Trades", group=grp_risk)
 maxBars  = input.int(60, "Max Bars in Trade", group=grp_risk)
@@ -46,7 +46,7 @@ htf4     = input.timeframe("240", "HTF 4 (4H)", group=grp_htf)
 htf5     = input.timeframe("D", "HTF 5 (Daily)", group=grp_htf)
 
 grp_conf = "Confluence"
-minScore = input.int(6, "Min Confluence (1-15)", minval=1, maxval=15, group=grp_conf)
+minScore = input.int(1, "Min Bonus Confluence (0-8)", minval=0, maxval=8, group=grp_conf, tooltip="All 7 mandatory conditions must be met first. This is BONUS on top. 0=just mandatory, 1+=extra selective.")
 
 // ============================================================================
 // ATR
@@ -161,8 +161,8 @@ recentBearMSS = bearMSS or bearMSS[1] or bearMSS[2] or bearMSS[3] or bearMSS[4]
 // 9. DISPLACEMENT — Institutional Intent
 // ============================================================================
 bodySize = math.abs(close - open)
-bullDisp = close > open and bodySize > atr * 1.5
-bearDisp = close < open and bodySize > atr * 1.5
+bullDisp = close > open and bodySize > atr * 2.0
+bearDisp = close < open and bodySize > atr * 2.0
 recentBullDisp = bullDisp or bullDisp[1] or bullDisp[2] or bullDisp[3]
 recentBearDisp = bearDisp or bearDisp[1] or bearDisp[2] or bearDisp[3]
 
@@ -494,74 +494,47 @@ confirmBull = bullReject or bullEngulf or bullRejBlock
 confirmBear = bearReject or bearEngulf or bearRejBlock
 
 // ============================================================================
-// 22. CONFLUENCE SCORING ENGINE (Weighted, max 15)
-//     Every PD Array and concept that aligns adds weight
+// 22. MANDATORY CONDITIONS (ICT's Full Model — ALL must be true)
+//     ICT's near-100% win rate comes from requiring EVERY piece:
+//     1. Liquidity MUST be swept (price delivered to liquidity)
+//     2. MSS MUST occur (smart money confirmed shift)
+//     3. Price MUST be in a PD Array (delivered to reaction zone)
+//     4. Price MUST react (confirmation candle at PD Array)
+//     5. HTF MUST agree (top-down alignment)
+//     6. Kill Zone MUST be active (institutional hours)
+//     7. Price MUST be in correct 8th/quadrant (discount for buys, premium for sells)
+// ============================================================================
+
+// PD Array delivery + reaction (price delivered to AND reacted from)
+pdArrayBullDelivery = inBullOB or inBullFVG or inBullBrk or inInvBullOB or inBullMit or inInvBullFVG
+pdArrayBearDelivery = inBearOB or inBearFVG or inBearBrk or inInvBearOB or inBearMit or inInvBearFVG
+
+// Price must REACT at the PD Array (not just be there)
+pdArrayBullReaction = pdArrayBullDelivery and confirmBull
+pdArrayBearReaction = pdArrayBearDelivery and confirmBear
+
+// MANDATORY gates — every one must be true
+mandatoryBull = recentBullSweep and recentBullMSS and pdArrayBullReaction and htfStrongBull and kzOK and eighthBull and recentBullDisp
+mandatoryBear = recentBearSweep and recentBearMSS and pdArrayBearReaction and htfStrongBear and kzOK and eighthBear and recentBearDisp
+
+// ============================================================================
+// 23. BONUS CONFLUENCE SCORE (extra weight on top of mandatory)
+//     These add confidence but aren't required
 // ============================================================================
 var int bullC = 0, var int bearC = 0
 bullC := 0
 bearC := 0
 
-// +2 Liquidity swept (ICT's #1 — must happen first)
-if recentBullSweep or turtleBull
-    bullC += 2
-if recentBearSweep or turtleBear
-    bearC += 2
-
-// +2 MSS/CHoCH confirmed (ICT's #2 — confirms smart money shifted)
-if recentBullMSS
-    bullC += 2
-if recentBearMSS
-    bearC += 2
-
-// +1 PD Array: OB / Breaker / Inverse OB / Mitigation Block
-if inBullOB or inBullBrk or inInvBullOB or inBullMit
-    bullC += 1
-if inBearOB or inBearBrk or inInvBearOB or inBearMit
-    bearC += 1
-
-// +1 PD Array: FVG / Inverse FVG
-if inBullFVG or inInvBullFVG
-    bullC += 1
-if inBearFVG or inInvBearFVG
-    bearC += 1
-
-// +1 PD Array: Rejection Block
-if bullRejBlock and inDiscount
-    bullC += 1
-if bearRejBlock and inPremium
-    bearC += 1
-
-// +1 OTE zone
+// +1 OTE zone (sniper precision)
 if inOTE_bull
     bullC += 1
 if inOTE_bear
     bearC += 1
 
-// +2 8ths alignment (sweet spots get +2, regular discount/premium +1)
+// +1 Sweet spot 8ths (3/8 for buys, 5/8 for sells)
 if eighthSweetBull
-    bullC += 2
-else if eighthBull
     bullC += 1
 if eighthSweetBear
-    bearC += 2
-else if eighthBear
-    bearC += 1
-
-// +2 Multi-HTF alignment (3+ HTFs agree)
-if htfStrongBull
-    bullC += 2
-if htfStrongBear
-    bearC += 2
-
-// +1 Kill Zone / Silver Bullet active
-if kzOK
-    bullC += 1
-    bearC += 1
-
-// +1 Confirmation candle
-if confirmBull
-    bullC += 1
-if confirmBear
     bearC += 1
 
 // +1 NDOG/NWOG alignment
@@ -569,8 +542,37 @@ if inNDOG or inNWOG
     bullC += 1
     bearC += 1
 
+// +1 Turtle Soup pattern
+if turtleBull
+    bullC += 1
+if turtleBear
+    bearC += 1
+
+// +1 Rejection Block at level
+if bullRejBlock and inDiscount
+    bullC += 1
+if bearRejBlock and inPremium
+    bearC += 1
+
+// +1 Liquidity void behind entry (clean space for price to run)
+if liqVoidBull
+    bullC += 1
+if liqVoidBear
+    bearC += 1
+
+// +1 Silver Bullet window (highest probability times)
+if inSB
+    bullC += 1
+    bearC += 1
+
+// +1 4+ HTFs aligned (extremely strong bias)
+if htfBullCount >= 4
+    bullC += 1
+if htfBearCount >= 4
+    bearC += 1
+
 // ============================================================================
-// 23. DAILY TRADE LIMITER
+// 24. DAILY TRADE LIMITER
 // ============================================================================
 var int dayTrades = 0
 if ta.change(time("D")) != 0
@@ -578,26 +580,27 @@ if ta.change(time("D")) != 0
 canGo = dayTrades < maxDaily
 
 // ============================================================================
-// 24. ENTRY CONDITIONS — ICT 2022 Model + Pyramid Logic
-//     Entry 1: Initial entry on sweep + MSS + PD Array
-//     Entry 2: Price retests deeper into OB/FVG (pyramid add)
-//     Entry 3: Price hits OTE zone (final pyramid add)
+// 25. ENTRY CONDITIONS — ICT 2022 Model + Pyramid Logic
+//     ALL mandatory conditions must be met. Bonus score adds confidence.
+//     Entry 1: Full model (all mandatory + bonus >= 1)
+//     Entry 2: Pyramid at deeper PD Array retest while in profit
+//     Entry 3: Pyramid at OTE zone with confirmation
 // ============================================================================
 noPos    = strategy.position_size == 0
 isLong   = strategy.position_size > 0
 isShort  = strategy.position_size < 0
 
-// First entry — full model
-goLong1  = bullC >= minScore and canGo and noPos and recentBullDisp and kzOK
-goShort1 = bearC >= minScore and canGo and noPos and recentBearDisp and kzOK
+// First entry — FULL ICT model (every mandatory condition met)
+goLong1  = mandatoryBull and canGo and noPos and bullC >= 1
+goShort1 = mandatoryBear and canGo and noPos and bearC >= 1
 
-// Pyramid entry 2 — deeper into PD Array while in profit
-goLong2  = isLong and strategy.openprofit > 0 and (inBullOB or inBullFVG) and bullC >= (minScore - 1) and strategy.opentrades < 2
-goShort2 = isShort and strategy.openprofit > 0 and (inBearOB or inBearFVG) and bearC >= (minScore - 1) and strategy.opentrades < 2
+// Pyramid entry 2 — deeper PD Array retest while in profit + mandatory gates still hold
+goLong2  = isLong and strategy.openprofit > 0 and pdArrayBullReaction and htfStrongBull and eighthBull and strategy.opentrades < 2
+goShort2 = isShort and strategy.openprofit > 0 and pdArrayBearReaction and htfStrongBear and eighthBear and strategy.opentrades < 2
 
-// Pyramid entry 3 — OTE zone hit while still in profit
-goLong3  = isLong and strategy.openprofit > 0 and inOTE_bull and confirmBull and strategy.opentrades < 3
-goShort3 = isShort and strategy.openprofit > 0 and inOTE_bear and confirmBear and strategy.opentrades < 3
+// Pyramid entry 3 — OTE zone with confirmation while profitable
+goLong3  = isLong and strategy.openprofit > 0 and inOTE_bull and confirmBull and htfStrongBull and strategy.opentrades < 3
+goShort3 = isShort and strategy.openprofit > 0 and inOTE_bear and confirmBear and htfStrongBear and strategy.opentrades < 3
 
 // ============================================================================
 // 25. MAGNIFICENT STOP LOSS (ICT's SL Concepts)
@@ -623,12 +626,12 @@ if goLong1
         best := s3
     sl_l := best - syminfo.mintick * 2
     dist = close - sl_l
-    // Partial TPs at key R levels — ICT scales out
-    tp1_l := close + dist * rr1   // 25% off at 1.5R
-    tp2_l := close + dist * rr2   // 25% off at 2.5R
-    // Final TP: opposing liquidity or fixed R:R
-    oppLiq = not na(pdh) ? pdh : close + dist * rr3
-    tp3_l := math.max(oppLiq, close + dist * rr3)  // 50% rides to target
+    // ICT Partial TPs — take profit where price delivers to opposing PD Arrays
+    tp1_l := close + dist * rr1   // 50% off at 1R (secure the bag)
+    tp2_l := close + dist * rr2   // 30% off at 1.5R
+    // Final TP: opposing liquidity (PDH/equilibrium) or 2R — whichever is closer
+    oppLiq = not na(pdh) and pdh > close ? pdh : close + dist * rr3
+    tp3_l := oppLiq  // 20% rides to opposing liquidity
     entryPx := close
     entryBar := bar_index
 
@@ -645,10 +648,10 @@ if goShort1
         best := s3
     sl_s := best + syminfo.mintick * 2
     dist = sl_s - close
-    tp1_s := close - dist * rr1
-    tp2_s := close - dist * rr2
-    oppLiq = not na(pdl) ? pdl : close - dist * rr3
-    tp3_s := math.min(oppLiq, close - dist * rr3)
+    tp1_s := close - dist * rr1   // 50% off at 1R
+    tp2_s := close - dist * rr2   // 30% off at 1.5R
+    oppLiq = not na(pdl) and pdl < close ? pdl : close - dist * rr3
+    tp3_s := oppLiq  // 20% rides to opposing liquidity
     entryPx := close
     entryBar := bar_index
 
@@ -679,15 +682,15 @@ timeExitS = isShort and (bar_index - entryBar) >= maxBars
 // Entry 1 — Initial position
 if goLong1
     strategy.entry("L1", strategy.long)
-    strategy.exit("LX1", "L1", stop=sl_l, limit=tp1_l, qty_percent=25)
-    strategy.exit("LX2", "L1", stop=sl_l, limit=tp2_l, qty_percent=33)
+    strategy.exit("LX1", "L1", stop=sl_l, limit=tp1_l, qty_percent=50)
+    strategy.exit("LX2", "L1", stop=sl_l, limit=tp2_l, qty_percent=60)
     strategy.exit("LX3", "L1", stop=sl_l, limit=tp3_l)
     dayTrades += 1
 
 if goShort1
     strategy.entry("S1", strategy.short)
-    strategy.exit("SX1", "S1", stop=sl_s, limit=tp1_s, qty_percent=25)
-    strategy.exit("SX2", "S1", stop=sl_s, limit=tp2_s, qty_percent=33)
+    strategy.exit("SX1", "S1", stop=sl_s, limit=tp1_s, qty_percent=50)
+    strategy.exit("SX2", "S1", stop=sl_s, limit=tp2_s, qty_percent=60)
     strategy.exit("SX3", "S1", stop=sl_s, limit=tp3_s)
     dayTrades += 1
 
@@ -715,15 +718,15 @@ if goShort3
 
 // Dynamic SL updates (break-even movement)
 if isLong and not goLong1
-    strategy.exit("LX1", "L1", stop=sl_l, limit=tp1_l, qty_percent=25)
-    strategy.exit("LX2", "L1", stop=sl_l, limit=tp2_l, qty_percent=33)
+    strategy.exit("LX1", "L1", stop=sl_l, limit=tp1_l, qty_percent=50)
+    strategy.exit("LX2", "L1", stop=sl_l, limit=tp2_l, qty_percent=60)
     strategy.exit("LX3", "L1", stop=sl_l, limit=tp3_l)
     strategy.exit("L2X", "L2", stop=sl_l, limit=tp3_l)
     strategy.exit("L3X", "L3", stop=sl_l, limit=tp3_l)
 
 if isShort and not goShort1
-    strategy.exit("SX1", "S1", stop=sl_s, limit=tp1_s, qty_percent=25)
-    strategy.exit("SX2", "S1", stop=sl_s, limit=tp2_s, qty_percent=33)
+    strategy.exit("SX1", "S1", stop=sl_s, limit=tp1_s, qty_percent=50)
+    strategy.exit("SX2", "S1", stop=sl_s, limit=tp2_s, qty_percent=60)
     strategy.exit("SX3", "S1", stop=sl_s, limit=tp3_s)
     strategy.exit("S2X", "S2", stop=sl_s, limit=tp3_s)
     strategy.exit("S3X", "S3", stop=sl_s, limit=tp3_s)
