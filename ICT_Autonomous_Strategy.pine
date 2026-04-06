@@ -727,8 +727,8 @@ goLong1  = mandatoryBull and canGo and noPos and bullC >= minScore
 goShort1 = mandatoryBear and canGo and noPos and bearC >= minScore
 
 // Pyramid entry 2 — deeper PD Array retest while in profit + mandatory gates still hold
-goLong2  = isLong and strategy.openprofit > 0 and pdArrayBullReaction and htfStrongBull and eighthBull and strategy.opentrades < 2
-goShort2 = isShort and strategy.openprofit > 0 and pdArrayBearReaction and htfStrongBear and eighthBear and strategy.opentrades < 2
+goLong2  = isLong and strategy.openprofit > 0 and pdArrayBull and recentConfirmBull and htfStrongBull and eighthBull and strategy.opentrades < 2
+goShort2 = isShort and strategy.openprofit > 0 and pdArrayBear and recentConfirmBear and htfStrongBear and eighthBear and strategy.opentrades < 2
 
 // Pyramid entry 3 — OTE zone with confirmation while profitable
 goLong3  = isLong and strategy.openprofit > 0 and inOTE_bull and confirmBull and htfStrongBull and strategy.opentrades < 3
