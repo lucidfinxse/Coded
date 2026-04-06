@@ -46,7 +46,7 @@ htf4     = input.timeframe("240", "HTF 4 (4H)", group=grp_htf)
 htf5     = input.timeframe("D", "HTF 5 (Daily)", group=grp_htf)
 
 grp_conf = "Confluence"
-minScore = input.int(1, "Min Bonus Confluence (0-8)", minval=0, maxval=8, group=grp_conf, tooltip="All 7 mandatory conditions must be met first. This is BONUS on top. 0=just mandatory, 1+=extra selective.")
+minScore = input.int(3, "Min Bonus Confluence (0-12)", minval=0, maxval=12, group=grp_conf, tooltip="5 mandatory gates must be met first (sweep+MSS+PD Array+KZ+8th). This is BONUS on top. 3=high quality. 5+=sniper.")
 
 // ============================================================================
 // ATR
@@ -154,17 +154,17 @@ if bullBOS or bullMSS
 if bearBOS or bearMSS
     trend := -1
 
-recentBullMSS = bullMSS or bullMSS[1] or bullMSS[2] or bullMSS[3] or bullMSS[4]
-recentBearMSS = bearMSS or bearMSS[1] or bearMSS[2] or bearMSS[3] or bearMSS[4]
+recentBullMSS = bullMSS or bullMSS[1] or bullMSS[2] or bullMSS[3] or bullMSS[4] or bullMSS[5] or bullMSS[6] or bullMSS[7] or bullMSS[8] or bullMSS[9]
+recentBearMSS = bearMSS or bearMSS[1] or bearMSS[2] or bearMSS[3] or bearMSS[4] or bearMSS[5] or bearMSS[6] or bearMSS[7] or bearMSS[8] or bearMSS[9]
 
 // ============================================================================
 // 9. DISPLACEMENT — Institutional Intent
 // ============================================================================
 bodySize = math.abs(close - open)
-bullDisp = close > open and bodySize > atr * 2.0
-bearDisp = close < open and bodySize > atr * 2.0
-recentBullDisp = bullDisp or bullDisp[1] or bullDisp[2] or bullDisp[3]
-recentBearDisp = bearDisp or bearDisp[1] or bearDisp[2] or bearDisp[3]
+bullDisp = close > open and bodySize > atr * 1.5
+bearDisp = close < open and bodySize > atr * 1.5
+recentBullDisp = bullDisp or bullDisp[1] or bullDisp[2] or bullDisp[3] or bullDisp[4] or bullDisp[5] or bullDisp[6] or bullDisp[7] or bullDisp[8] or bullDisp[9]
+recentBearDisp = bearDisp or bearDisp[1] or bearDisp[2] or bearDisp[3] or bearDisp[4] or bearDisp[5] or bearDisp[6] or bearDisp[7] or bearDisp[8] or bearDisp[9]
 
 // ============================================================================
 // 10. ORDER BLOCKS + INVERSE ORDER BLOCKS (PD Array)
@@ -354,8 +354,8 @@ if liqBull
 if liqBear
     sweepBearHigh := high
 
-recentBullSweep = liqBull or liqBull[1] or liqBull[2] or liqBull[3] or liqBull[4]
-recentBearSweep = liqBear or liqBear[1] or liqBear[2] or liqBear[3] or liqBear[4]
+recentBullSweep = liqBull or liqBull[1] or liqBull[2] or liqBull[3] or liqBull[4] or liqBull[5] or liqBull[6] or liqBull[7] or liqBull[8] or liqBull[9] or liqBull[10] or liqBull[11] or liqBull[12] or liqBull[13] or liqBull[14]
+recentBearSweep = liqBear or liqBear[1] or liqBear[2] or liqBear[3] or liqBear[4] or liqBear[5] or liqBear[6] or liqBear[7] or liqBear[8] or liqBear[9] or liqBear[10] or liqBear[11] or liqBear[12] or liqBear[13] or liqBear[14]
 if eqLoSweep
     eqLoOn := false
 if eqHiSweep
@@ -478,8 +478,8 @@ htf5bear = htf5c < htf5o
 htfBullCount = (htf1bull ? 1 : 0) + (htf2bull ? 1 : 0) + (htf3bull ? 1 : 0) + (htf4bull ? 1 : 0) + (htf5bull ? 1 : 0)
 htfBearCount = (htf1bear ? 1 : 0) + (htf2bear ? 1 : 0) + (htf3bear ? 1 : 0) + (htf4bear ? 1 : 0) + (htf5bear ? 1 : 0)
 
-htfStrongBull = htfBullCount >= 3  // At least 3 of 5 HTFs bullish
-htfStrongBear = htfBearCount >= 3
+htfStrongBull = htfBullCount >= 2  // At least 2 of 5 HTFs bullish
+htfStrongBear = htfBearCount >= 2
 
 // ============================================================================
 // 21. CONFIRMATION CANDLE — Rejection or Engulfing at entry zone
@@ -505,17 +505,25 @@ confirmBear = bearReject or bearEngulf or bearRejBlock
 //     7. Price MUST be in correct 8th/quadrant (discount for buys, premium for sells)
 // ============================================================================
 
-// PD Array delivery + reaction (price delivered to AND reacted from)
-pdArrayBullDelivery = inBullOB or inBullFVG or inBullBrk or inInvBullOB or inBullMit or inInvBullFVG
-pdArrayBearDelivery = inBearOB or inBearFVG or inBearBrk or inInvBearOB or inBearMit or inInvBearFVG
+// PD Array delivery (price is currently in a PD Array zone)
+pdArrayBull = inBullOB or inBullFVG or inBullBrk or inInvBullOB or inBullMit or inInvBullFVG
+pdArrayBear = inBearOB or inBearFVG or inBearBrk or inInvBearOB or inBearMit or inInvBearFVG
 
-// Price must REACT at the PD Array (not just be there)
-pdArrayBullReaction = pdArrayBullDelivery and confirmBull
-pdArrayBearReaction = pdArrayBearDelivery and confirmBear
+// Recent confirmation candle (within last 3 bars — reaction from the PD Array)
+recentConfirmBull = confirmBull or confirmBull[1] or confirmBull[2]
+recentConfirmBear = confirmBear or confirmBear[1] or confirmBear[2]
 
-// MANDATORY gates — every one must be true
-mandatoryBull = recentBullSweep and recentBullMSS and pdArrayBullReaction and htfStrongBull and kzOK and eighthBull and recentBullDisp
-mandatoryBear = recentBearSweep and recentBearMSS and pdArrayBearReaction and htfStrongBear and kzOK and eighthBear and recentBearDisp
+// PD Array with reaction = delivery + recent reaction (not same-bar required)
+pdArrayBullReaction = pdArrayBull and recentConfirmBull
+pdArrayBearReaction = pdArrayBear and recentConfirmBear
+
+// MANDATORY gates (5 core conditions — all must be true)
+// 1. Liquidity swept  2. MSS confirmed  3. In PD Array  4. Kill Zone active  5. Correct 8th
+mandatoryBull = recentBullSweep and recentBullMSS and pdArrayBull and kzOK and eighthBull
+mandatoryBear = recentBearSweep and recentBearMSS and pdArrayBear and kzOK and eighthBear
+
+// QUALITY gates (make the trade better — scored, not mandatory)
+// Confirmation candle, HTF alignment, displacement are scored below
 
 // ============================================================================
 // 23. BONUS CONFLUENCE SCORE (extra weight on top of mandatory)
@@ -524,6 +532,24 @@ mandatoryBear = recentBearSweep and recentBearMSS and pdArrayBearReaction and ht
 var int bullC = 0, var int bearC = 0
 bullC := 0
 bearC := 0
+
+// +2 Confirmation candle (reaction from PD Array — very important)
+if recentConfirmBull
+    bullC += 2
+if recentConfirmBear
+    bearC += 2
+
+// +2 HTF alignment (top-down bias)
+if htfStrongBull
+    bullC += 2
+if htfStrongBear
+    bearC += 2
+
+// +1 Displacement present (institutional intent)
+if recentBullDisp
+    bullC += 1
+if recentBearDisp
+    bearC += 1
 
 // +1 OTE zone (sniper precision)
 if inOTE_bull
@@ -542,30 +568,24 @@ if inNDOG or inNWOG
     bullC += 1
     bearC += 1
 
-// +1 Turtle Soup pattern
+// +1 Silver Bullet window
+if inSB
+    bullC += 1
+    bearC += 1
+
+// +1 Turtle Soup
 if turtleBull
     bullC += 1
 if turtleBear
     bearC += 1
 
-// +1 Rejection Block at level
+// +1 Rejection Block
 if bullRejBlock and inDiscount
     bullC += 1
 if bearRejBlock and inPremium
     bearC += 1
 
-// +1 Liquidity void behind entry (clean space for price to run)
-if liqVoidBull
-    bullC += 1
-if liqVoidBear
-    bearC += 1
-
-// +1 Silver Bullet window (highest probability times)
-if inSB
-    bullC += 1
-    bearC += 1
-
-// +1 4+ HTFs aligned (extremely strong bias)
+// +1 4+ HTFs aligned (very strong)
 if htfBullCount >= 4
     bullC += 1
 if htfBearCount >= 4
@@ -590,9 +610,11 @@ noPos    = strategy.position_size == 0
 isLong   = strategy.position_size > 0
 isShort  = strategy.position_size < 0
 
-// First entry — FULL ICT model (every mandatory condition met)
-goLong1  = mandatoryBull and canGo and noPos and bullC >= 1
-goShort1 = mandatoryBear and canGo and noPos and bearC >= 1
+// First entry — Mandatory gates + quality bonus score
+// Mandatory: sweep + MSS + PD Array + KZ + correct 8th
+// Bonus >= 3 means: confirmation + (HTF or displacement or OTE)
+goLong1  = mandatoryBull and canGo and noPos and bullC >= minScore
+goShort1 = mandatoryBear and canGo and noPos and bearC >= minScore
 
 // Pyramid entry 2 — deeper PD Array retest while in profit + mandatory gates still hold
 goLong2  = isLong and strategy.openprofit > 0 and pdArrayBullReaction and htfStrongBull and eighthBull and strategy.opentrades < 2
