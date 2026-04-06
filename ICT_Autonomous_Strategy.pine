@@ -46,7 +46,7 @@ htf4     = input.timeframe("240", "HTF 4 (4H)", group=grp_htf)
 htf5     = input.timeframe("D", "HTF 5 (Daily)", group=grp_htf)
 
 grp_conf = "Confluence"
-minScore = input.int(2, "Min Bonus Confluence (0-12)", minval=0, maxval=12, group=grp_conf, tooltip="4 mandatory gates must be met first (sweep+MSS+PD Array+KZ). This is BONUS on top. 2=balanced. 4+=sniper.")
+minScore = input.int(0, "Min Bonus Confluence (0-12)", minval=0, maxval=12, group=grp_conf, tooltip="4 mandatory gates met first (sweep+MSS+PD Array+KZ). Start at 0 to verify trades fire, then raise for quality.")
 
 // ============================================================================
 // ATR
@@ -401,46 +401,26 @@ else
     inOTE_bear := false
 
 // ============================================================================
-// 19. PREMIUM / DISCOUNT with 8THS (ICT's Quadrants in 8ths)
-//     Dealing range split into 8 equal zones at 12.5% increments
-//     0%=Low, 12.5%=1/8, 25%=Q1, 37.5%=3/8, 50%=EQ, 62.5%=5/8, 75%=Q3, 87.5%=7/8, 100%=High
-//     Buy zones: 1/8, 2/8(Q1), 3/8 — Sell zones: 5/8, 6/8(Q3), 7/8
-//     Sweet spots: 3/8 (just below EQ) and 5/8 (just above EQ)
+// 19. PREMIUM / DISCOUNT with QUADRANTS (4 zones)
 // ============================================================================
 drHi = ta.highest(high, eighthsLen)
 drLo = ta.lowest(low, eighthsLen)
 drRange = drHi - drLo
 eq   = drLo + drRange * 0.5
 
-// 8ths levels
-e1 = drLo + drRange * 0.125   // 1/8 — extreme discount
-e2 = drLo + drRange * 0.250   // 2/8 (Q1) — deep discount
-e3 = drLo + drRange * 0.375   // 3/8 — discount sweet spot
-e4 = drLo + drRange * 0.500   // 4/8 (EQ) — equilibrium
-e5 = drLo + drRange * 0.625   // 5/8 — premium sweet spot
-e6 = drLo + drRange * 0.750   // 6/8 (Q3) — deep premium
-e7 = drLo + drRange * 0.875   // 7/8 — extreme premium
+q1 = drLo + drRange * 0.25   // Deep discount
+q2 = drLo + drRange * 0.50   // Equilibrium
+q3 = drLo + drRange * 0.75   // Premium
 
-// Which 8th is price in?
-inE1 = close <= e1                      // Extreme discount (below 1/8)
-inE2 = close > e1 and close <= e2       // Deep discount (1/8 to 2/8)
-inE3 = close > e2 and close <= e3       // Discount sweet spot (2/8 to 3/8)
-inE4lo = close > e3 and close <= e4     // Below equilibrium (3/8 to EQ)
-inE4hi = close > e4 and close <= e5     // Above equilibrium (EQ to 5/8)
-inE5 = close > e4 and close <= e5       // Premium sweet spot entry
-inE6 = close > e5 and close <= e6       // Deep premium (5/8 to 6/8)
-inE7 = close > e6 and close <= e7       // Extreme premium (6/8 to 7/8)
-inE8 = close > e7                       // Above 7/8
+inDiscount     = close < q2
+inPremium      = close > q2
+inDeepDiscount = close < q1
+inDeepPremium  = close > q3
 
-inDiscount = close < e4
-inPremium  = close > e4
-
-// PD Array 8ths alignment — buy in discount 8ths, sell in premium 8ths
-// ICT sweet spots are 3/8 for buys and 5/8 for sells
-eighthBull = inE1 or inE2 or inE3 or inE4lo  // Below EQ = buy zone
-eighthBear = inE4hi or inE5 or inE6 or inE7 or inE8  // Above EQ = sell zone
-eighthSweetBull = inE3 or inE2 or inE1  // Deep discount 8ths
-eighthSweetBear = inE5 or inE6 or inE7  // Deep premium 8ths
+eighthBull = inDiscount           // Below EQ = buy zone
+eighthBear = inPremium            // Above EQ = sell zone
+eighthSweetBull = inDeepDiscount  // Deep discount
+eighthSweetBear = inDeepPremium   // Deep premium
 
 // ============================================================================
 // 20. MULTI-TIMEFRAME BIAS + HTF PD ARRAYS
@@ -732,9 +712,8 @@ noPos    = strategy.position_size == 0
 isLong   = strategy.position_size > 0
 isShort  = strategy.position_size < 0
 
-// First entry — Mandatory gates + quality bonus score
-// Mandatory: sweep + MSS + PD Array + KZ + correct 8th
-// Bonus >= 3 means: confirmation + (HTF or displacement or OTE)
+// First entry — Mandatory gates met, bonus adds quality
+// If no trades appear, set Min Bonus to 0 in settings to test mandatory gates alone
 goLong1  = mandatoryBull and canGo and noPos and bullC >= minScore
 goShort1 = mandatoryBear and canGo and noPos and bearC >= minScore
 
