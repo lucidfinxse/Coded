@@ -46,7 +46,7 @@ htf4     = input.timeframe("240", "HTF 4 (4H)", group=grp_htf)
 htf5     = input.timeframe("D", "HTF 5 (Daily)", group=grp_htf)
 
 grp_conf = "Confluence"
-minScore = input.int(3, "Min Bonus Confluence (0-12)", minval=0, maxval=12, group=grp_conf, tooltip="5 mandatory gates must be met first (sweep+MSS+PD Array+KZ+8th). This is BONUS on top. 3=high quality. 5+=sniper.")
+minScore = input.int(2, "Min Bonus Confluence (0-12)", minval=0, maxval=12, group=grp_conf, tooltip="4 mandatory gates must be met first (sweep+MSS+PD Array+KZ). This is BONUS on top. 2=balanced. 4+=sniper.")
 
 // ============================================================================
 // ATR
@@ -365,9 +365,12 @@ if eqHiSweep
 // 17. TURTLE SOUP (PD Array) — Grab beyond prev session H/L then reverse
 // ============================================================================
 var float prevSessHi = na, var float prevSessLo = na
+// ta.highest/ta.lowest must be called on every bar (Pine Script requirement)
+_highest60 = ta.highest(high, 60)
+_lowest60  = ta.lowest(low, 60)
 if inKZ and not inKZ[1]
-    prevSessHi := ta.highest(high, 60)
-    prevSessLo := ta.lowest(low, 60)
+    prevSessHi := _highest60
+    prevSessLo := _lowest60
 
 turtleBull = not na(prevSessLo) and inKZ and low < prevSessLo and close > prevSessLo
 turtleBear = not na(prevSessHi) and inKZ and high > prevSessHi and close < prevSessHi
@@ -619,10 +622,15 @@ recentConfirmBear = confirmBear or confirmBear[1] or confirmBear[2]
 
 // ============================================================================
 // 23. MANDATORY CONDITIONS
-//     5 core conditions — all must be true to enter
+//     4 core conditions — all must be true to enter
+//     PD Array check includes HTF PD Arrays (15m/1H OB or FVG counts)
 // ============================================================================
-mandatoryBull = recentBullSweep and recentBullMSS and pdArrayBull and kzOK and eighthBull
-mandatoryBear = recentBearSweep and recentBearMSS and pdArrayBear and kzOK and eighthBear
+// PD Array gate: in ANY PD Array (1m OR 15m OR 1H) — HTF PD Arrays count
+anyPDAbull = pdArrayBull or in15mBullPDA or in1hBullPDA
+anyPDAbear = pdArrayBear or in15mBearPDA or in1hBearPDA
+
+mandatoryBull = recentBullSweep and recentBullMSS and anyPDAbull and kzOK
+mandatoryBear = recentBearSweep and recentBearMSS and anyPDAbear and kzOK
 
 // ============================================================================
 // 23. BONUS CONFLUENCE SCORE (extra weight on top of mandatory)
@@ -667,10 +675,14 @@ if inOTE_bull
 if inOTE_bear
     bearC += 1
 
-// +1 Sweet spot 8ths (3/8 for buys, 5/8 for sells)
+// +2 Correct 8th/quadrant alignment (moved from mandatory to scored)
 if eighthSweetBull
+    bullC += 2
+else if eighthBull
     bullC += 1
 if eighthSweetBear
+    bearC += 2
+else if eighthBear
     bearC += 1
 
 // +1 NDOG/NWOG alignment
