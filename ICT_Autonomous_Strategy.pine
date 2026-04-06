@@ -440,46 +440,147 @@ eighthSweetBull = inE3 or inE2 or inE1  // Deep discount 8ths
 eighthSweetBear = inE5 or inE6 or inE7  // Deep premium 8ths
 
 // ============================================================================
-// 20. MULTI-TIMEFRAME CONFLUENCE
-//     ICT always works top-down: Monthly → Daily → 4H → 1H → 15m → 5m → 1m
-//     Each HTF that agrees with the trade adds weight
+// 20. MULTI-TIMEFRAME BIAS + HTF PD ARRAYS
+//     ICT's key teaching: the BEST trades happen when HTF PD Arrays
+//     and LTF PD Arrays LINE UP at the same price level.
+//     A 15m OB inside a 1H FVG with a 1m OB entry = highest probability.
 // ============================================================================
-// 5m bias
+
+// --- HTF Candle Bias (direction) ---
 htf1c = request.security(syminfo.tickerid, htf1, close)
 htf1o = request.security(syminfo.tickerid, htf1, open)
 htf1bull = htf1c > htf1o
 htf1bear = htf1c < htf1o
 
-// 15m bias
 htf2c = request.security(syminfo.tickerid, htf2, close)
 htf2o = request.security(syminfo.tickerid, htf2, open)
 htf2bull = htf2c > htf2o
 htf2bear = htf2c < htf2o
 
-// 1H bias
 htf3c = request.security(syminfo.tickerid, htf3, close)
 htf3o = request.security(syminfo.tickerid, htf3, open)
 htf3bull = htf3c > htf3o
 htf3bear = htf3c < htf3o
 
-// 4H bias
 htf4c = request.security(syminfo.tickerid, htf4, close)
 htf4o = request.security(syminfo.tickerid, htf4, open)
 htf4bull = htf4c > htf4o
 htf4bear = htf4c < htf4o
 
-// Daily bias
 htf5c = request.security(syminfo.tickerid, htf5, close)
 htf5o = request.security(syminfo.tickerid, htf5, open)
 htf5bull = htf5c > htf5o
 htf5bear = htf5c < htf5o
 
-// Count aligned HTFs
 htfBullCount = (htf1bull ? 1 : 0) + (htf2bull ? 1 : 0) + (htf3bull ? 1 : 0) + (htf4bull ? 1 : 0) + (htf5bull ? 1 : 0)
 htfBearCount = (htf1bear ? 1 : 0) + (htf2bear ? 1 : 0) + (htf3bear ? 1 : 0) + (htf4bear ? 1 : 0) + (htf5bear ? 1 : 0)
-
-htfStrongBull = htfBullCount >= 2  // At least 2 of 5 HTFs bullish
+htfStrongBull = htfBullCount >= 2
 htfStrongBear = htfBearCount >= 2
+
+// --- 15m PD Arrays (Order Blocks + FVGs from 15m chart) ---
+htf2_h  = request.security(syminfo.tickerid, htf2, high)
+htf2_l  = request.security(syminfo.tickerid, htf2, low)
+htf2_h1 = request.security(syminfo.tickerid, htf2, high[1])
+htf2_l1 = request.security(syminfo.tickerid, htf2, low[1])
+htf2_o1 = request.security(syminfo.tickerid, htf2, open[1])
+htf2_c1 = request.security(syminfo.tickerid, htf2, close[1])
+htf2_h2 = request.security(syminfo.tickerid, htf2, high[2])
+htf2_atr = request.security(syminfo.tickerid, htf2, ta.atr(14))
+
+// 15m Bullish OB: prior 15m candle bearish before bullish displacement on 15m
+htf2_bullDisp = htf2c > htf2o and math.abs(htf2c - htf2o) > htf2_atr * 1.2
+htf2_bearDisp = htf2c < htf2o and math.abs(htf2c - htf2o) > htf2_atr * 1.2
+
+var float htf2_bullOB_hi = na, var float htf2_bullOB_lo = na, var bool htf2_bullOB_on = false
+var float htf2_bearOB_hi = na, var float htf2_bearOB_lo = na, var bool htf2_bearOB_on = false
+
+if htf2_bullDisp and htf2_c1 < htf2_o1
+    htf2_bullOB_hi := math.max(htf2_o1, htf2_c1)
+    htf2_bullOB_lo := math.min(htf2_o1, htf2_c1)
+    htf2_bullOB_on := true
+if htf2_bearDisp and htf2_c1 > htf2_o1
+    htf2_bearOB_hi := math.max(htf2_o1, htf2_c1)
+    htf2_bearOB_lo := math.min(htf2_o1, htf2_c1)
+    htf2_bearOB_on := true
+if htf2_bullOB_on and close < htf2_bullOB_lo
+    htf2_bullOB_on := false
+if htf2_bearOB_on and close > htf2_bearOB_hi
+    htf2_bearOB_on := false
+
+// 15m FVG
+htf2_bullFVG_cond = htf2_l > htf2_h2
+var float htf2_bullFVG_hi = na, var float htf2_bullFVG_lo = na, var bool htf2_bullFVG_on = false
+var float htf2_bearFVG_hi = na, var float htf2_bearFVG_lo = na, var bool htf2_bearFVG_on = false
+htf2_bearFVG_cond = htf2_h < request.security(syminfo.tickerid, htf2, low[2])
+
+if htf2_bullFVG_cond
+    htf2_bullFVG_hi := htf2_l
+    htf2_bullFVG_lo := htf2_h2
+    htf2_bullFVG_on := true
+if htf2_bearFVG_cond
+    htf2_bearFVG_hi := request.security(syminfo.tickerid, htf2, low[2])
+    htf2_bearFVG_lo := htf2_h
+    htf2_bearFVG_on := true
+if htf2_bullFVG_on and close < htf2_bullFVG_lo
+    htf2_bullFVG_on := false
+if htf2_bearFVG_on and close > htf2_bearFVG_hi
+    htf2_bearFVG_on := false
+
+// 1m price inside 15m PD Arrays?
+in15mBullPDA = (htf2_bullOB_on and close >= htf2_bullOB_lo and close <= htf2_bullOB_hi) or (htf2_bullFVG_on and close >= htf2_bullFVG_lo and close <= htf2_bullFVG_hi)
+in15mBearPDA = (htf2_bearOB_on and close >= htf2_bearOB_lo and close <= htf2_bearOB_hi) or (htf2_bearFVG_on and close >= htf2_bearFVG_lo and close <= htf2_bearFVG_hi)
+
+// --- 1H PD Arrays (Order Blocks + FVGs from 1H chart) ---
+htf3_h  = request.security(syminfo.tickerid, htf3, high)
+htf3_l  = request.security(syminfo.tickerid, htf3, low)
+htf3_h1 = request.security(syminfo.tickerid, htf3, high[1])
+htf3_l1 = request.security(syminfo.tickerid, htf3, low[1])
+htf3_o1 = request.security(syminfo.tickerid, htf3, open[1])
+htf3_c1 = request.security(syminfo.tickerid, htf3, close[1])
+htf3_h2 = request.security(syminfo.tickerid, htf3, high[2])
+htf3_atr = request.security(syminfo.tickerid, htf3, ta.atr(14))
+
+htf3_bullDisp = htf3c > htf3o and math.abs(htf3c - htf3o) > htf3_atr * 1.2
+htf3_bearDisp = htf3c < htf3o and math.abs(htf3c - htf3o) > htf3_atr * 1.2
+
+var float htf3_bullOB_hi = na, var float htf3_bullOB_lo = na, var bool htf3_bullOB_on = false
+var float htf3_bearOB_hi = na, var float htf3_bearOB_lo = na, var bool htf3_bearOB_on = false
+
+if htf3_bullDisp and htf3_c1 < htf3_o1
+    htf3_bullOB_hi := math.max(htf3_o1, htf3_c1)
+    htf3_bullOB_lo := math.min(htf3_o1, htf3_c1)
+    htf3_bullOB_on := true
+if htf3_bearDisp and htf3_c1 > htf3_o1
+    htf3_bearOB_hi := math.max(htf3_o1, htf3_c1)
+    htf3_bearOB_lo := math.min(htf3_o1, htf3_c1)
+    htf3_bearOB_on := true
+if htf3_bullOB_on and close < htf3_bullOB_lo
+    htf3_bullOB_on := false
+if htf3_bearOB_on and close > htf3_bearOB_hi
+    htf3_bearOB_on := false
+
+// 1H FVG
+htf3_bullFVG_cond = htf3_l > htf3_h2
+var float htf3_bullFVG_hi = na, var float htf3_bullFVG_lo = na, var bool htf3_bullFVG_on = false
+var float htf3_bearFVG_hi = na, var float htf3_bearFVG_lo = na, var bool htf3_bearFVG_on = false
+htf3_bearFVG_cond = htf3_h < request.security(syminfo.tickerid, htf3, low[2])
+
+if htf3_bullFVG_cond
+    htf3_bullFVG_hi := htf3_l
+    htf3_bullFVG_lo := htf3_h2
+    htf3_bullFVG_on := true
+if htf3_bearFVG_cond
+    htf3_bearFVG_hi := request.security(syminfo.tickerid, htf3, low[2])
+    htf3_bearFVG_lo := htf3_h
+    htf3_bearFVG_on := true
+if htf3_bullFVG_on and close < htf3_bullFVG_lo
+    htf3_bullFVG_on := false
+if htf3_bearFVG_on and close > htf3_bearFVG_hi
+    htf3_bearFVG_on := false
+
+// 1m price inside 1H PD Arrays?
+in1hBullPDA = (htf3_bullOB_on and close >= htf3_bullOB_lo and close <= htf3_bullOB_hi) or (htf3_bullFVG_on and close >= htf3_bullFVG_lo and close <= htf3_bullFVG_hi)
+in1hBearPDA = (htf3_bearOB_on and close >= htf3_bearOB_lo and close <= htf3_bearOB_hi) or (htf3_bearFVG_on and close >= htf3_bearFVG_lo and close <= htf3_bearFVG_hi)
 
 // ============================================================================
 // 21. CONFIRMATION CANDLE — Rejection or Engulfing at entry zone
@@ -494,36 +595,34 @@ confirmBull = bullReject or bullEngulf or bullRejBlock
 confirmBear = bearReject or bearEngulf or bearRejBlock
 
 // ============================================================================
-// 22. MANDATORY CONDITIONS (ICT's Full Model — ALL must be true)
-//     ICT's near-100% win rate comes from requiring EVERY piece:
-//     1. Liquidity MUST be swept (price delivered to liquidity)
-//     2. MSS MUST occur (smart money confirmed shift)
-//     3. Price MUST be in a PD Array (delivered to reaction zone)
-//     4. Price MUST react (confirmation candle at PD Array)
-//     5. HTF MUST agree (top-down alignment)
-//     6. Kill Zone MUST be active (institutional hours)
-//     7. Price MUST be in correct 8th/quadrant (discount for buys, premium for sells)
+// 22. LTF PD Array + HTF PD Array STACKING
+//     ICT's highest probability: when PD Arrays from multiple timeframes
+//     line up at the same price — that's where institutions have orders stacked.
+//     A 1m OB sitting inside a 15m FVG inside a 1H OB = "the trade of the day"
 // ============================================================================
 
-// PD Array delivery (price is currently in a PD Array zone)
+// LTF PD Array delivery (1m price in a 1m PD Array zone)
 pdArrayBull = inBullOB or inBullFVG or inBullBrk or inInvBullOB or inBullMit or inInvBullFVG
 pdArrayBear = inBearOB or inBearFVG or inBearBrk or inInvBearOB or inBearMit or inInvBearFVG
 
-// Recent confirmation candle (within last 3 bars — reaction from the PD Array)
+// HTF PD Array STACKING — LTF PD Array overlaps with HTF PD Array
+htfPDAstackBull = pdArrayBull and (in15mBullPDA or in1hBullPDA)
+htfPDAstackBear = pdArrayBear and (in15mBearPDA or in1hBearPDA)
+
+// Any HTF PD Array present (even without LTF overlap)
+anyHTFbullPDA = in15mBullPDA or in1hBullPDA
+anyHTFbearPDA = in15mBearPDA or in1hBearPDA
+
+// Recent confirmation candle (within last 3 bars)
 recentConfirmBull = confirmBull or confirmBull[1] or confirmBull[2]
 recentConfirmBear = confirmBear or confirmBear[1] or confirmBear[2]
 
-// PD Array with reaction = delivery + recent reaction (not same-bar required)
-pdArrayBullReaction = pdArrayBull and recentConfirmBull
-pdArrayBearReaction = pdArrayBear and recentConfirmBear
-
-// MANDATORY gates (5 core conditions — all must be true)
-// 1. Liquidity swept  2. MSS confirmed  3. In PD Array  4. Kill Zone active  5. Correct 8th
+// ============================================================================
+// 23. MANDATORY CONDITIONS
+//     5 core conditions — all must be true to enter
+// ============================================================================
 mandatoryBull = recentBullSweep and recentBullMSS and pdArrayBull and kzOK and eighthBull
 mandatoryBear = recentBearSweep and recentBearMSS and pdArrayBear and kzOK and eighthBear
-
-// QUALITY gates (make the trade better — scored, not mandatory)
-// Confirmation candle, HTF alignment, displacement are scored below
 
 // ============================================================================
 // 23. BONUS CONFLUENCE SCORE (extra weight on top of mandatory)
@@ -533,13 +632,24 @@ var int bullC = 0, var int bearC = 0
 bullC := 0
 bearC := 0
 
+// +3 HTF PD Array STACKING (THE highest probability — ICT's best concept)
+//    When 1m PD Array sits inside 15m or 1H PD Array = institutional order stacking
+if htfPDAstackBull
+    bullC += 3
+else if anyHTFbullPDA
+    bullC += 1  // HTF PD Array present but not overlapping with LTF
+if htfPDAstackBear
+    bearC += 3
+else if anyHTFbearPDA
+    bearC += 1
+
 // +2 Confirmation candle (reaction from PD Array — very important)
 if recentConfirmBull
     bullC += 2
 if recentConfirmBear
     bearC += 2
 
-// +2 HTF alignment (top-down bias)
+// +2 HTF bias alignment (top-down direction)
 if htfStrongBull
     bullC += 2
 if htfStrongBear
