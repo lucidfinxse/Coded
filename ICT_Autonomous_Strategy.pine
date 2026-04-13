@@ -2,7 +2,7 @@
 // © ICT PD Array Engine - Every Concept, Multi-HTF, Pyramiding, Silent Execution
 //@version=6
 strategy("ICT PD Array Engine v6", overlay=true, margin_long=100, margin_short=100,
-     default_qty_type=strategy.percent_of_equity, default_qty_value=1,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=2,
      pyramiding=3, calc_on_every_tick=true, process_orders_on_close=false,
      max_bars_back=500, fill_orders_on_standard_ohlc=true)
 
@@ -808,7 +808,15 @@ timeExitS = isShort and (bar_index - entryBar) >= maxBars
 //     ICT's partial profit: 25% at TP1, 25% at TP2, 50% rides to TP3
 // ============================================================================
 
-// Entry 1 — Initial position
+// Pyramid sizing — big base, smaller adds (like a pyramid structure)
+// Entry 1: 2.0% equity (base — heaviest conviction)
+// Entry 2: 1.2% equity (mid — confirmed retest)
+// Entry 3: 0.8% equity (top — OTE precision add)
+// Total max exposure: 4.0% equity across all 3 entries
+pyrQty2 = strategy.equity * 0.012 / close  // 1.2% of equity in asset units
+pyrQty3 = strategy.equity * 0.008 / close  // 0.8% of equity in asset units
+
+// Entry 1 — Initial position (2% — default qty)
 if goLong1
     strategy.entry("L1", strategy.long)
     strategy.exit("LX1", "L1", stop=sl_l, limit=tp1_l, qty_percent=50)
@@ -823,25 +831,25 @@ if goShort1
     strategy.exit("SX3", "S1", stop=sl_s, limit=tp3_s)
     dayTrades += 1
 
-// Entry 2 — Pyramid add at PD Array retest
+// Entry 2 — Pyramid add at PD Array retest (1.2% — smaller than base)
 if goLong2
-    strategy.entry("L2", strategy.long)
+    strategy.entry("L2", strategy.long, qty=pyrQty2)
     strategy.exit("L2X", "L2", stop=sl_l, limit=tp3_l)
     dayTrades += 1
 
 if goShort2
-    strategy.entry("S2", strategy.short)
+    strategy.entry("S2", strategy.short, qty=pyrQty2)
     strategy.exit("S2X", "S2", stop=sl_s, limit=tp3_s)
     dayTrades += 1
 
-// Entry 3 — Pyramid add at OTE
+// Entry 3 — Pyramid add at OTE (0.8% — smallest, precision sniper add)
 if goLong3
-    strategy.entry("L3", strategy.long)
+    strategy.entry("L3", strategy.long, qty=pyrQty3)
     strategy.exit("L3X", "L3", stop=sl_l, limit=tp3_l)
     dayTrades += 1
 
 if goShort3
-    strategy.entry("S3", strategy.short)
+    strategy.entry("S3", strategy.short, qty=pyrQty3)
     strategy.exit("S3X", "S3", stop=sl_s, limit=tp3_s)
     dayTrades += 1
 
