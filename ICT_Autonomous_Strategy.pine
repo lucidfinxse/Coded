@@ -144,6 +144,12 @@ if not na(swL)
     lastSL := swL
     lastSLbar := bar_index - swingLen
 
+// Initialize trend from 0 on first structure break (fixes deadlock)
+if trend == 0 and not na(lastSH) and close > lastSH
+    trend := 1
+if trend == 0 and not na(lastSL) and close < lastSL
+    trend := -1
+
 bullBOS = not na(lastSH) and close > lastSH and trend == 1
 bearBOS = not na(lastSL) and close < lastSL and trend == -1
 bullMSS = not na(lastSH) and close > lastSH and trend == -1
@@ -154,8 +160,8 @@ if bullBOS or bullMSS
 if bearBOS or bearMSS
     trend := -1
 
-recentBullMSS = bullMSS or bullMSS[1] or bullMSS[2] or bullMSS[3] or bullMSS[4] or bullMSS[5] or bullMSS[6] or bullMSS[7] or bullMSS[8] or bullMSS[9]
-recentBearMSS = bearMSS or bearMSS[1] or bearMSS[2] or bearMSS[3] or bearMSS[4] or bearMSS[5] or bearMSS[6] or bearMSS[7] or bearMSS[8] or bearMSS[9]
+recentBullMSS = bullMSS or bullMSS[1] or bullMSS[2] or bullMSS[3] or bullMSS[4] or bullMSS[5] or bullMSS[6] or bullMSS[7] or bullMSS[8] or bullMSS[9] or bullMSS[10] or bullMSS[11] or bullMSS[12] or bullMSS[13] or bullMSS[14]
+recentBearMSS = bearMSS or bearMSS[1] or bearMSS[2] or bearMSS[3] or bearMSS[4] or bearMSS[5] or bearMSS[6] or bearMSS[7] or bearMSS[8] or bearMSS[9] or bearMSS[10] or bearMSS[11] or bearMSS[12] or bearMSS[13] or bearMSS[14]
 
 // ============================================================================
 // 9. DISPLACEMENT — Institutional Intent
