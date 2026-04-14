@@ -31,10 +31,10 @@ oteFibHi = input.float(0.79, "OTE Upper", group=grp_ote)
 oteFibLo = input.float(0.62, "OTE Lower", group=grp_ote)
 
 grp_risk = "Risk & Pyramiding"
-rr1      = input.float(1.0, "Partial TP1 R:R (50%)", group=grp_risk)
-rr2      = input.float(1.5, "Partial TP2 R:R (30%)", group=grp_risk)
-rr3      = input.float(2.0, "Final TP3 R:R (20%)", group=grp_risk)
-useBE    = input.bool(true, "Break-Even at 1R", group=grp_risk)
+rr1      = input.float(0.75, "Partial TP1 R:R (60% off)", group=grp_risk, tooltip="Take 60% profit fast — biggest win rate booster")
+rr2      = input.float(1.5, "Partial TP2 R:R (20% off)", group=grp_risk)
+rr3      = input.float(2.5, "Final TP3 R:R (20% runner)", group=grp_risk, tooltip="Let 20% ride to big target or opposing liquidity")
+useBE    = input.bool(true, "Staircase Profit Lock", group=grp_risk, tooltip="0.5R→BE, 1R→lock 0.5R, 1.5R→lock 1R")
 maxDaily = input.int(500, "Max Daily Trades", group=grp_risk)
 maxBars  = input.int(90, "Max Bars in Trade", group=grp_risk)
 
@@ -46,7 +46,7 @@ htf4     = input.timeframe("240", "HTF 4 (4H)", group=grp_htf)
 htf5     = input.timeframe("D", "HTF 5 (Daily)", group=grp_htf)
 
 grp_conf = "Confluence"
-minScore = input.int(2, "Min Bonus Confluence (0-14)", minval=0, maxval=14, group=grp_conf, tooltip="7 mandatory gates met first (sweep+structure+PDA+KZ+HTF+P/D+disp/confirm). Bonus adds extra quality.")
+minScore = input.int(1, "Min Bonus Confluence (0-16)", minval=0, maxval=16, group=grp_conf, tooltip="6 mandatory gates met first (sweep+structure+PDA+HTF+P/D+disp/confirm). KZ now scored. Raise for quality.")
 
 // ============================================================================
 // ATR
@@ -160,10 +160,10 @@ if bullBOS or bullMSS
 if bearBOS or bearMSS
     trend := -1
 
-recentBullMSS = bullMSS or bullMSS[1] or bullMSS[2] or bullMSS[3] or bullMSS[4] or bullMSS[5] or bullMSS[6] or bullMSS[7] or bullMSS[8] or bullMSS[9] or bullMSS[10] or bullMSS[11] or bullMSS[12] or bullMSS[13] or bullMSS[14] or bullMSS[15] or bullMSS[16] or bullMSS[17] or bullMSS[18] or bullMSS[19]
-recentBearMSS = bearMSS or bearMSS[1] or bearMSS[2] or bearMSS[3] or bearMSS[4] or bearMSS[5] or bearMSS[6] or bearMSS[7] or bearMSS[8] or bearMSS[9] or bearMSS[10] or bearMSS[11] or bearMSS[12] or bearMSS[13] or bearMSS[14] or bearMSS[15] or bearMSS[16] or bearMSS[17] or bearMSS[18] or bearMSS[19]
-recentBullBOS = bullBOS or bullBOS[1] or bullBOS[2] or bullBOS[3] or bullBOS[4] or bullBOS[5] or bullBOS[6] or bullBOS[7] or bullBOS[8] or bullBOS[9] or bullBOS[10] or bullBOS[11] or bullBOS[12] or bullBOS[13] or bullBOS[14] or bullBOS[15] or bullBOS[16] or bullBOS[17] or bullBOS[18] or bullBOS[19]
-recentBearBOS = bearBOS or bearBOS[1] or bearBOS[2] or bearBOS[3] or bearBOS[4] or bearBOS[5] or bearBOS[6] or bearBOS[7] or bearBOS[8] or bearBOS[9] or bearBOS[10] or bearBOS[11] or bearBOS[12] or bearBOS[13] or bearBOS[14] or bearBOS[15] or bearBOS[16] or bearBOS[17] or bearBOS[18] or bearBOS[19]
+recentBullMSS = bullMSS or bullMSS[1] or bullMSS[2] or bullMSS[3] or bullMSS[4] or bullMSS[5] or bullMSS[6] or bullMSS[7] or bullMSS[8] or bullMSS[9] or bullMSS[10] or bullMSS[11] or bullMSS[12] or bullMSS[13] or bullMSS[14] or bullMSS[15] or bullMSS[16] or bullMSS[17] or bullMSS[18] or bullMSS[19] or bullMSS[20] or bullMSS[21] or bullMSS[22] or bullMSS[23] or bullMSS[24]
+recentBearMSS = bearMSS or bearMSS[1] or bearMSS[2] or bearMSS[3] or bearMSS[4] or bearMSS[5] or bearMSS[6] or bearMSS[7] or bearMSS[8] or bearMSS[9] or bearMSS[10] or bearMSS[11] or bearMSS[12] or bearMSS[13] or bearMSS[14] or bearMSS[15] or bearMSS[16] or bearMSS[17] or bearMSS[18] or bearMSS[19] or bearMSS[20] or bearMSS[21] or bearMSS[22] or bearMSS[23] or bearMSS[24]
+recentBullBOS = bullBOS or bullBOS[1] or bullBOS[2] or bullBOS[3] or bullBOS[4] or bullBOS[5] or bullBOS[6] or bullBOS[7] or bullBOS[8] or bullBOS[9] or bullBOS[10] or bullBOS[11] or bullBOS[12] or bullBOS[13] or bullBOS[14] or bullBOS[15] or bullBOS[16] or bullBOS[17] or bullBOS[18] or bullBOS[19] or bullBOS[20] or bullBOS[21] or bullBOS[22] or bullBOS[23] or bullBOS[24]
+recentBearBOS = bearBOS or bearBOS[1] or bearBOS[2] or bearBOS[3] or bearBOS[4] or bearBOS[5] or bearBOS[6] or bearBOS[7] or bearBOS[8] or bearBOS[9] or bearBOS[10] or bearBOS[11] or bearBOS[12] or bearBOS[13] or bearBOS[14] or bearBOS[15] or bearBOS[16] or bearBOS[17] or bearBOS[18] or bearBOS[19] or bearBOS[20] or bearBOS[21] or bearBOS[22] or bearBOS[23] or bearBOS[24]
 
 // Combined structure signal: MSS (reversal) OR BOS (continuation) — more entries
 recentBullStructure = recentBullMSS or recentBullBOS
@@ -175,8 +175,8 @@ recentBearStructure = recentBearMSS or recentBearBOS
 bodySize = math.abs(close - open)
 bullDisp = close > open and bodySize > atr * 1.0
 bearDisp = close < open and bodySize > atr * 1.0
-recentBullDisp = bullDisp or bullDisp[1] or bullDisp[2] or bullDisp[3] or bullDisp[4] or bullDisp[5] or bullDisp[6] or bullDisp[7] or bullDisp[8] or bullDisp[9]
-recentBearDisp = bearDisp or bearDisp[1] or bearDisp[2] or bearDisp[3] or bearDisp[4] or bearDisp[5] or bearDisp[6] or bearDisp[7] or bearDisp[8] or bearDisp[9]
+recentBullDisp = bullDisp or bullDisp[1] or bullDisp[2] or bullDisp[3] or bullDisp[4] or bullDisp[5] or bullDisp[6] or bullDisp[7] or bullDisp[8] or bullDisp[9] or bullDisp[10] or bullDisp[11] or bullDisp[12] or bullDisp[13] or bullDisp[14]
+recentBearDisp = bearDisp or bearDisp[1] or bearDisp[2] or bearDisp[3] or bearDisp[4] or bearDisp[5] or bearDisp[6] or bearDisp[7] or bearDisp[8] or bearDisp[9] or bearDisp[10] or bearDisp[11] or bearDisp[12] or bearDisp[13] or bearDisp[14]
 
 // ============================================================================
 // 10. ORDER BLOCKS + INVERSE ORDER BLOCKS (PD Array)
@@ -366,8 +366,8 @@ if liqBull
 if liqBear
     sweepBearHigh := high
 
-recentBullSweep = liqBull or liqBull[1] or liqBull[2] or liqBull[3] or liqBull[4] or liqBull[5] or liqBull[6] or liqBull[7] or liqBull[8] or liqBull[9] or liqBull[10] or liqBull[11] or liqBull[12] or liqBull[13] or liqBull[14] or liqBull[15] or liqBull[16] or liqBull[17] or liqBull[18] or liqBull[19]
-recentBearSweep = liqBear or liqBear[1] or liqBear[2] or liqBear[3] or liqBear[4] or liqBear[5] or liqBear[6] or liqBear[7] or liqBear[8] or liqBear[9] or liqBear[10] or liqBear[11] or liqBear[12] or liqBear[13] or liqBear[14] or liqBear[15] or liqBear[16] or liqBear[17] or liqBear[18] or liqBear[19]
+recentBullSweep = liqBull or liqBull[1] or liqBull[2] or liqBull[3] or liqBull[4] or liqBull[5] or liqBull[6] or liqBull[7] or liqBull[8] or liqBull[9] or liqBull[10] or liqBull[11] or liqBull[12] or liqBull[13] or liqBull[14] or liqBull[15] or liqBull[16] or liqBull[17] or liqBull[18] or liqBull[19] or liqBull[20] or liqBull[21] or liqBull[22] or liqBull[23] or liqBull[24]
+recentBearSweep = liqBear or liqBear[1] or liqBear[2] or liqBear[3] or liqBear[4] or liqBear[5] or liqBear[6] or liqBear[7] or liqBear[8] or liqBear[9] or liqBear[10] or liqBear[11] or liqBear[12] or liqBear[13] or liqBear[14] or liqBear[15] or liqBear[16] or liqBear[17] or liqBear[18] or liqBear[19] or liqBear[20] or liqBear[21] or liqBear[22] or liqBear[23] or liqBear[24]
 if eqLoSweep
     eqLoOn := false
 if eqHiSweep
@@ -424,8 +424,10 @@ q1 = drLo + drRange * 0.25   // Deep discount
 q2 = drLo + drRange * 0.50   // Equilibrium
 q3 = drLo + drRange * 0.75   // Premium
 
-inDiscount     = close < q2
-inPremium      = close > q2
+// Small buffer around EQ (3% of range) — entries near EQ qualify for either side
+eqBuffer = drRange * 0.03
+inDiscount     = close < q2 + eqBuffer
+inPremium      = close > q2 - eqBuffer
 inDeepDiscount = close < q1
 inDeepPremium  = close > q3
 
@@ -617,20 +619,20 @@ dispOrConfirmBull = recentBullDisp or recentConfirmBull
 dispOrConfirmBear = recentBearDisp or recentConfirmBear
 
 // ============================================================================
-// 23. MANDATORY CONDITIONS — 7 ICT gates for high-probability entries
-//     1. Recent liquidity sweep (within 20 bars)
-//     2. Recent structure break — MSS or BOS (within 20 bars)
+// 23. MANDATORY CONDITIONS — 6 ICT gates for high-probability entries
+//     1. Recent liquidity sweep (within 25 bars)
+//     2. Recent structure break — MSS or BOS (within 25 bars)
 //     3. Price in any PD Array (1m / 15m / 1H)
-//     4. Inside Kill Zone or Silver Bullet window
-//     5. HTF bias alignment (3+ of 5 timeframes agree)
-//     6. Premium/Discount alignment (buy in discount, sell in premium)
-//     7. Displacement or Confirmation candle (institutional intent shown)
+//     4. HTF bias alignment (3+ of 5 timeframes agree)
+//     5. Premium/Discount alignment (buy in discount, sell in premium)
+//     6. Displacement or Confirmation candle (institutional intent shown)
+//     Kill Zone moved to bonus score — BTC trades 24/7, KZ adds quality not necessity
 // ============================================================================
 anyPDAbull = pdArrayBull or in15mBullPDA or in1hBullPDA
 anyPDAbear = pdArrayBear or in15mBearPDA or in1hBearPDA
 
-mandatoryBull = recentBullSweep and recentBullStructure and anyPDAbull and kzOK and htfStrongBull and inDiscount and dispOrConfirmBull
-mandatoryBear = recentBearSweep and recentBearStructure and anyPDAbear and kzOK and htfStrongBear and inPremium and dispOrConfirmBear
+mandatoryBull = recentBullSweep and recentBullStructure and anyPDAbull and htfStrongBull and inDiscount and dispOrConfirmBull
+mandatoryBear = recentBearSweep and recentBearStructure and anyPDAbear and htfStrongBear and inPremium and dispOrConfirmBear
 
 // ============================================================================
 // 23. BONUS CONFLUENCE SCORE (extra weight on top of mandatory)
@@ -690,8 +692,11 @@ if inNDOG or inNWOG
     bullC += 1
     bearC += 1
 
-// +1 Silver Bullet window
-if inSB
+// +2 Kill Zone or Silver Bullet (moved from mandatory — BTC trades 24/7)
+if kzOK
+    bullC += 2
+    bearC += 2
+else if inSB
     bullC += 1
     bearC += 1
 
@@ -816,24 +821,49 @@ if goShort1
     entryBar := bar_index
 
 // ============================================================================
-// 26. BREAK-EVEN AT 0.5R — Protect capital early, turn losers into scratches
-//     ICT teaches: once price shows it respects your level, remove risk
+// 26. STAIRCASE PROFIT LOCK — Lock progressively more profit as price runs
+//     0.5R → move stop to entry (breakeven — can't lose)
+//     1.0R → move stop to entry + 0.5R (lock half R profit)
+//     1.5R → move stop to entry + 1.0R (lock full R profit)
+//     This turns potential losers into breakeven, and breakevens into winners
 // ============================================================================
 if useBE and isLong and not na(entryPx) and not na(sl_l)
-    halfR = entryPx + (entryPx - sl_l) * 0.5
-    if high >= halfR
-        sl_l := entryPx + syminfo.mintick * 2  // Move stop to entry + tiny buffer
+    riskDist = entryPx - sl_l
+    if riskDist > 0
+        lvl05R = entryPx + riskDist * 0.5
+        lvl1R  = entryPx + riskDist * 1.0
+        lvl15R = entryPx + riskDist * 1.5
+        // Staircase: each level locks in more profit (highest reached wins)
+        if high >= lvl15R
+            sl_l := math.max(sl_l, entryPx + riskDist * 1.0)  // Lock 1R profit
+        else if high >= lvl1R
+            sl_l := math.max(sl_l, entryPx + riskDist * 0.5)  // Lock 0.5R profit
+        else if high >= lvl05R
+            sl_l := math.max(sl_l, entryPx + syminfo.mintick * 2)  // Breakeven
 
 if useBE and isShort and not na(entryPx) and not na(sl_s)
-    halfR = entryPx - (sl_s - entryPx) * 0.5
-    if low <= halfR
-        sl_s := entryPx - syminfo.mintick * 2
+    riskDist = sl_s - entryPx
+    if riskDist > 0
+        lvl05R = entryPx - riskDist * 0.5
+        lvl1R  = entryPx - riskDist * 1.0
+        lvl15R = entryPx - riskDist * 1.5
+        if low <= lvl15R
+            sl_s := math.min(sl_s, entryPx - riskDist * 1.0)
+        else if low <= lvl1R
+            sl_s := math.min(sl_s, entryPx - riskDist * 0.5)
+        else if low <= lvl05R
+            sl_s := math.min(sl_s, entryPx - syminfo.mintick * 2)
 
 // ============================================================================
-// 27. TIME EXIT — Don't hold 1m trades too long
+// 27. TIME EXIT — Only close if profitable or very expired (don't force losers)
+//     If in profit after maxBars: close and bank it
+//     If losing after maxBars: give 50% more time, then close (cut losses)
 // ============================================================================
-timeExitL = isLong and (bar_index - entryBar) >= maxBars
-timeExitS = isShort and (bar_index - entryBar) >= maxBars
+timeExitL = isLong and (bar_index - entryBar) >= maxBars and strategy.openprofit > 0
+timeExitS = isShort and (bar_index - entryBar) >= maxBars and strategy.openprofit > 0
+// Hard time limit: 1.5x maxBars regardless of P&L (don't hold forever)
+hardExitL = isLong and (bar_index - entryBar) >= math.round(maxBars * 1.5)
+hardExitS = isShort and (bar_index - entryBar) >= math.round(maxBars * 1.5)
 
 // ============================================================================
 // 28. AUTONOMOUS EXECUTION — Pyramiding + Partial TPs
@@ -849,17 +879,18 @@ pyrQty2 = strategy.equity * 0.012 / close  // 1.2% of equity in asset units
 pyrQty3 = strategy.equity * 0.008 / close  // 0.8% of equity in asset units
 
 // Entry 1 — Initial position (2% — default qty)
+// Partials: 60% at TP1 (0.75R), 50% of remainder at TP2 (1.5R), rest rides to TP3 (2.5R)
 if goLong1
     strategy.entry("L1", strategy.long)
-    strategy.exit("LX1", "L1", stop=sl_l, limit=tp1_l, qty_percent=50)
-    strategy.exit("LX2", "L1", stop=sl_l, limit=tp2_l, qty_percent=60)
+    strategy.exit("LX1", "L1", stop=sl_l, limit=tp1_l, qty_percent=60)
+    strategy.exit("LX2", "L1", stop=sl_l, limit=tp2_l, qty_percent=50)
     strategy.exit("LX3", "L1", stop=sl_l, limit=tp3_l)
     dayTrades += 1
 
 if goShort1
     strategy.entry("S1", strategy.short)
-    strategy.exit("SX1", "S1", stop=sl_s, limit=tp1_s, qty_percent=50)
-    strategy.exit("SX2", "S1", stop=sl_s, limit=tp2_s, qty_percent=60)
+    strategy.exit("SX1", "S1", stop=sl_s, limit=tp1_s, qty_percent=60)
+    strategy.exit("SX2", "S1", stop=sl_s, limit=tp2_s, qty_percent=50)
     strategy.exit("SX3", "S1", stop=sl_s, limit=tp3_s)
     dayTrades += 1
 
@@ -885,17 +916,17 @@ if goShort3
     strategy.exit("S3X", "S3", stop=sl_s, limit=tp3_s)
     dayTrades += 1
 
-// Dynamic SL updates (break-even movement)
+// Dynamic SL updates (staircase profit lock movement)
 if isLong and not goLong1
-    strategy.exit("LX1", "L1", stop=sl_l, limit=tp1_l, qty_percent=50)
-    strategy.exit("LX2", "L1", stop=sl_l, limit=tp2_l, qty_percent=60)
+    strategy.exit("LX1", "L1", stop=sl_l, limit=tp1_l, qty_percent=60)
+    strategy.exit("LX2", "L1", stop=sl_l, limit=tp2_l, qty_percent=50)
     strategy.exit("LX3", "L1", stop=sl_l, limit=tp3_l)
     strategy.exit("L2X", "L2", stop=sl_l, limit=tp3_l)
     strategy.exit("L3X", "L3", stop=sl_l, limit=tp3_l)
 
 if isShort and not goShort1
-    strategy.exit("SX1", "S1", stop=sl_s, limit=tp1_s, qty_percent=50)
-    strategy.exit("SX2", "S1", stop=sl_s, limit=tp2_s, qty_percent=60)
+    strategy.exit("SX1", "S1", stop=sl_s, limit=tp1_s, qty_percent=60)
+    strategy.exit("SX2", "S1", stop=sl_s, limit=tp2_s, qty_percent=50)
     strategy.exit("SX3", "S1", stop=sl_s, limit=tp3_s)
     strategy.exit("S2X", "S2", stop=sl_s, limit=tp3_s)
     strategy.exit("S3X", "S3", stop=sl_s, limit=tp3_s)
@@ -907,8 +938,8 @@ if isLong and bearMSS and bearDisp and htfBearCount >= 3
 if isShort and bullMSS and bullDisp and htfBullCount >= 3
     strategy.close_all(comment="Confirmed Reversal")
 
-// Time exit
-if timeExitL
+// Time exit (profit) + Hard time exit (any P&L)
+if timeExitL or hardExitL
     strategy.close_all(comment="Time")
-if timeExitS
+if timeExitS or hardExitS
     strategy.close_all(comment="Time")
